@@ -4,6 +4,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   DATABASE_URL: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -17,7 +18,25 @@ const envSchema = z.object({
   SUPABASE_CRON_VERIFY_SECRET: z.string().optional(),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const rawEnv = {
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  DATABASE_URL: process.env.DATABASE_URL,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  GOOGLE_OAUTH_REDIRECT_URI: process.env.GOOGLE_OAUTH_REDIRECT_URI,
+  TOKEN_ENCRYPTION_KEY: process.env.TOKEN_ENCRYPTION_KEY,
+  CUSTOM_CRM_API_KEYS: process.env.CUSTOM_CRM_API_KEYS,
+  DEFAULT_PER_USER_DAILY_CAP: process.env.DEFAULT_PER_USER_DAILY_CAP,
+  DEFAULT_PER_MINUTE_THROTTLE: process.env.DEFAULT_PER_MINUTE_THROTTLE,
+  FOLLOW_UP_DELAY_DAYS: process.env.FOLLOW_UP_DELAY_DAYS,
+  SUPABASE_CRON_VERIFY_SECRET: process.env.SUPABASE_CRON_VERIFY_SECRET,
+};
+
+const parsed = envSchema.safeParse(rawEnv);
 
 export const env = parsed.success
   ? parsed.data
@@ -29,9 +48,12 @@ export const env = parsed.success
 
 export const isSupabaseConfigured = Boolean(
   env.NEXT_PUBLIC_SUPABASE_URL &&
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    (env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) &&
     env.SUPABASE_SERVICE_ROLE_KEY,
 );
+
+export const supabaseBrowserKey =
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const isGoogleConfigured = Boolean(
   env.GOOGLE_CLIENT_ID &&

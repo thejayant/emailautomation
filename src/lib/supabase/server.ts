@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/db/database.types";
-import { env } from "@/lib/supabase/env";
+import { env, supabaseBrowserKey } from "@/lib/supabase/env";
 
 export async function createServerSupabaseClient() {
-  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  if (!env.NEXT_PUBLIC_SUPABASE_URL || !supabaseBrowserKey) {
     return null;
   }
 
@@ -12,7 +12,7 @@ export async function createServerSupabaseClient() {
 
   return createServerClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseBrowserKey,
     {
       cookies: {
         getAll() {

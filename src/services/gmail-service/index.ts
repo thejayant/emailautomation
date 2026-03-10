@@ -45,14 +45,18 @@ export async function exchangeGoogleCode(code: string) {
   }
 
   auth.setCredentials(tokens);
-  const oauth2 = google.oauth2({ auth, version: "v2" });
-  const { data } = await oauth2.userinfo.get();
+  const gmail = google.gmail({ auth, version: "v1" });
+  const { data } = await gmail.users.getProfile({ userId: "me" });
+
+  if (!data.emailAddress) {
+    throw new Error("Google OAuth exchange did not return a mailbox email address.");
+  }
 
   return {
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token ?? null,
     tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
-    emailAddress: data.email ?? "",
+    emailAddress: data.emailAddress,
     scopes: GMAIL_SCOPES,
   };
 }

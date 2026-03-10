@@ -10,33 +10,6 @@ begin
 end;
 $$;
 
-create or replace function public.is_workspace_member(target_workspace_id uuid)
-returns boolean
-language sql
-stable
-as $$
-  select exists (
-    select 1
-    from public.workspace_members
-    where workspace_id = target_workspace_id
-      and user_id = auth.uid()
-  );
-$$;
-
-create or replace function public.is_workspace_admin(target_workspace_id uuid)
-returns boolean
-language sql
-stable
-as $$
-  select exists (
-    select 1
-    from public.workspace_members
-    where workspace_id = target_workspace_id
-      and user_id = auth.uid()
-      and role in ('owner', 'admin')
-  );
-$$;
-
 create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -382,6 +355,33 @@ create trigger set_updated_at_campaign_contacts before update on public.campaign
 for each row execute function public.set_updated_at();
 create trigger set_updated_at_message_threads before update on public.message_threads
 for each row execute function public.set_updated_at();
+
+create or replace function public.is_workspace_member(target_workspace_id uuid)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from public.workspace_members
+    where workspace_id = target_workspace_id
+      and user_id = auth.uid()
+  );
+$$;
+
+create or replace function public.is_workspace_admin(target_workspace_id uuid)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from public.workspace_members
+    where workspace_id = target_workspace_id
+      and user_id = auth.uid()
+      and role in ('owner', 'admin')
+  );
+$$;
 
 create or replace function public.handle_new_user()
 returns trigger

@@ -8,7 +8,47 @@ import { getWorkspaceContext } from "@/lib/db/workspace";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
 
-export default async function ProfilePage() {
+type ProfilePageProps = {
+  searchParams?: Promise<{
+    gmail?: string;
+    message?: string;
+  }>;
+};
+
+function getGmailBanner(gmail?: string, message?: string) {
+  if (gmail === "connected") {
+    return {
+      tone: "success",
+      text: "Gmail mailbox connected successfully.",
+    };
+  }
+
+  if (gmail === "disconnected") {
+    return {
+      tone: "default",
+      text: "Gmail mailbox disconnected.",
+    };
+  }
+
+  if (gmail === "missing-code") {
+    return {
+      tone: "error",
+      text: "Google did not return a valid OAuth code.",
+    };
+  }
+
+  if (gmail === "error") {
+    return {
+      tone: "error",
+      text: message ? decodeURIComponent(message) : "Gmail connection failed.",
+    };
+  }
+
+  return null;
+}
+
+export default async function ProfilePage({ searchParams }: ProfilePageProps) {
+  const params = (await searchParams) ?? {};
   const workspace = await getWorkspaceContext();
   const supabase = createAdminSupabaseClient();
   const { data: rawProfile } = await supabase
@@ -22,6 +62,7 @@ export default async function ProfilePage() {
     email_address: string;
     status: string;
   }>;
+  const gmailBanner = getGmailBanner(params.gmail, params.message);
 
   return (
     <div className="grid gap-8">
@@ -30,6 +71,19 @@ export default async function ProfilePage() {
         title="Personal settings"
         description="Manage your profile, mailbox connection, and personal sending defaults."
       />
+      {gmailBanner ? (
+        <div
+          className={
+            gmailBanner.tone === "error"
+              ? "rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
+              : gmailBanner.tone === "success"
+                ? "rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700"
+                : "rounded-2xl border border-border/60 bg-card/70 px-4 py-3 text-sm text-foreground"
+          }
+        >
+          {gmailBanner.text}
+        </div>
+      ) : null}
       <ProfileForm
         defaultValues={{
           fullName: profile?.full_name ?? "",
