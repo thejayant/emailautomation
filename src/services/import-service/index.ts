@@ -1,5 +1,6 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { requireSupabaseConfiguration } from "@/lib/supabase/env";
+import type { ContactRecord } from "@/lib/types/contact";
 import { googleSheetsUrlToCsvUrl, parseImportFile, type ParsedImportRow } from "@/lib/utils/imports";
 
 export function mapImportRow(row: ParsedImportRow) {
@@ -33,6 +34,10 @@ export function mapImportRow(row: ParsedImportRow) {
   };
 }
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export async function listContacts(workspaceId: string) {
   requireSupabaseConfiguration();
 
@@ -48,15 +53,47 @@ export async function listContacts(workspaceId: string) {
     throw error;
   }
 
-  return data as Array<{
-    id: string;
-    email: string;
-    first_name?: string | null;
-    last_name?: string | null;
-    company?: string | null;
-    source?: string | null;
-    unsubscribed_at?: string | null;
-  }>;
+  return data as ContactRecord[];
+}
+
+export async function createManualContact(input: {
+  workspaceId: string;
+  userId: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  company?: string | null;
+  website?: string | null;
+  jobTitle?: string | null;
+}) {
+  requireSupabaseConfiguration();
+
+  const supabase = createAdminSupabaseClient();
+  const { data, error } = await supabase
+    .from("contacts")
+    .insert({
+      workspace_id: input.workspaceId,
+      owner_user_id: input.userId,
+      email: normalizeEmail(input.email),
+      first_name: input.firstName?.trim() || null,
+      last_name: input.lastName?.trim() || null,
+      company: input.company?.trim() || null,
+      website: input.website?.trim() || null,
+      job_title: input.jobTitle?.trim() || null,
+      source: "manual",
+    })
+    .select("id, email, first_name, last_name, company, source, unsubscribed_at")
+    .single();
+
+  if (error) {
+    if (/duplicate key value/i.test(error.message)) {
+      throw new Error("Contact already exists in this workspace.");
+    }
+
+    throw error;
+  }
+
+  return data as ContactRecord;
 }
 
 export async function listImports(workspaceId: string) {

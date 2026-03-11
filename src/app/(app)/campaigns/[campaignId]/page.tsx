@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header";
+import { SendNowButton } from "@/components/campaigns/send-now-button";
 import { SimpleDataTable } from "@/components/data-table/simple-data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,17 +42,20 @@ export default async function CampaignDetailPage({
         title={campaign.name}
         description="Inspect contact-level queue state, follow-up timing, failures, and pause/resume actions."
         actions={
-          <form action="/api/campaigns/pause" method="post">
-            <input type="hidden" name="campaignId" value={campaignId} />
-            <input
-              type="hidden"
-              name="status"
-              value={campaign.status === "active" ? "paused" : "active"}
-            />
-            <Button type="submit" variant="outline">
-              {campaign.status === "active" ? "Pause campaign" : "Resume campaign"}
-            </Button>
-          </form>
+          <div className="flex flex-wrap gap-3">
+            <SendNowButton campaignId={campaignId} />
+            <form action="/api/campaigns/pause" method="post">
+              <input type="hidden" name="campaignId" value={campaignId} />
+              <input
+                type="hidden"
+                name="status"
+                value={campaign.status === "active" ? "paused" : "active"}
+              />
+              <Button type="submit" variant="outline">
+                {campaign.status === "active" ? "Pause campaign" : "Resume campaign"}
+              </Button>
+            </form>
+          </div>
         }
       />
       <div className="grid gap-4 md:grid-cols-4">

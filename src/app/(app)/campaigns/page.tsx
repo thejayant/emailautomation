@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SendNowButton } from "@/components/campaigns/send-now-button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/page-header";
@@ -48,6 +49,18 @@ export default async function CampaignsPage() {
           },
           { key: "daily_send_limit", header: "Daily cap" },
           { key: "timezone", header: "Timezone" },
+          {
+            key: "actions",
+            header: "Actions",
+            render: (row) => (
+              <div className="flex items-center gap-2">
+                <SendNowButton campaignId={row.id} size="sm" disabled={row.status !== "active"} />
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/campaigns/${row.id}`}>Open</Link>
+                </Button>
+              </div>
+            ),
+          },
         ]}
       />
     </div>

@@ -109,9 +109,19 @@ Deno.serve(async (request) => {
       failed_attempts,
       next_due_at,
       contact:contacts(email, first_name, company, website, custom_fields_jsonb, unsubscribed_at),
-      campaign:campaigns(id, workspace_id, name, status, gmail_account_id, daily_send_limit, send_window_start, send_window_end, timezone),
-      outbound_messages(step_number),
-      campaign_steps!inner(step_number, subject_template, body_template, wait_days)
+      campaign:campaigns(
+        id,
+        workspace_id,
+        name,
+        status,
+        gmail_account_id,
+        daily_send_limit,
+        send_window_start,
+        send_window_end,
+        timezone,
+        campaign_steps(step_number, subject_template, body_template, wait_days)
+      ),
+      outbound_messages(step_number)
     `)
     .in("status", ["queued", "followup_due"])
     .lte("next_due_at", new Date().toISOString())
@@ -135,7 +145,12 @@ Deno.serve(async (request) => {
       continue;
     }
 
-    const step = (item.campaign_steps as Array<{ step_number: number; subject_template: string; body_template: string }>).find(
+    const step = (
+      item.campaign?.campaign_steps as
+        | Array<{ step_number: number; subject_template: string; body_template: string }>
+        | null
+        | undefined
+    )?.find(
       (candidate) => candidate.step_number === item.current_step,
     );
 
@@ -209,7 +224,7 @@ Deno.serve(async (request) => {
       await supabase
         .from("campaign_contacts")
         .update({
-          status: item.current_step === 1 ? "sent" : "followup_sent",
+          status: item.current_step === 1 ? "followup_due" : "followup_sent",
           current_step: item.current_step === 1 ? 2 : item.current_step,
           next_due_at:
             item.current_step === 1

@@ -11,7 +11,7 @@ export default async function NewCampaignPage() {
     listContacts(workspace.workspaceId),
   ]);
   const gmailAccounts = rawGmailAccounts as Array<{ id: string; email_address: string }>;
-  const contacts = rawContacts as Array<{ id: string; email: string; company?: string | null }>;
+  const contacts = rawContacts;
 
   return (
     <div className="grid gap-8">

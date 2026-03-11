@@ -21,6 +21,15 @@ export const templateSchema = z.object({
   bodyTemplate: z.string().min(10),
 });
 
+export const manualContactSchema = z.object({
+  email: z.email(),
+  firstName: z.string().max(120).optional().or(z.literal("")),
+  lastName: z.string().max(120).optional().or(z.literal("")),
+  company: z.string().max(160).optional().or(z.literal("")),
+  website: z.string().max(255).optional().or(z.literal("")),
+  jobTitle: z.string().max(160).optional().or(z.literal("")),
+});
+
 export const campaignLaunchSchema = z.object({
   campaignName: z.string().min(2).max(120),
   gmailAccountId: z.string().uuid(),
@@ -62,6 +71,10 @@ export const customCrmPayloadSchema = z.object({
 export const pauseCampaignSchema = z.object({
   campaignId: z.string().uuid(),
   status: z.enum(["paused", "active"]),
+});
+
+export const sendNowCampaignSchema = z.object({
+  campaignId: z.string().uuid(),
 });
 
 export const resendCampaignContactSchema = z.object({

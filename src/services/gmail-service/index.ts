@@ -1,8 +1,10 @@
+import "server-only";
 import { google } from "googleapis";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { decryptToken, encryptToken } from "@/lib/crypto/tokens";
 import {
   env,
+  isGoogleConfigured,
   requireGoogleConfiguration,
   requireSupabaseConfiguration,
 } from "@/lib/supabase/env";
@@ -384,4 +386,134 @@ export async function sendReplyToThread(input: {
     gmailThreadId: sendResult.threadId,
     recipientEmail,
   };
+}
+
+export async function syncWorkspaceReplies(workspaceId: string) {
+  requireSupabaseConfiguration();
+
+  if (!isGoogleConfigured) {
+    return { syncedThreads: 0, inboundMessages: 0, mailboxErrors: 0 };
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const { data: rawMailboxes, error } = await supabase
+    .from("gmail_accounts")
+    .select("id, workspace_id, email_address, last_history_id")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "active");
+
+  if (error) {
+    throw error;
+  }
+
+  const mailboxes = (rawMailboxes ?? []) as Array<{
+    id: string;
+    workspace_id: string;
+    email_address: string;
+    last_history_id?: string | null;
+  }>;
+
+  let syncedThreads = 0;
+  let inboundMessages = 0;
+  let mailboxErrors = 0;
+
+  for (const mailbox of mailboxes) {
+    try {
+      const access = await getMailboxAccessTokenForAccount(mailbox.id);
+      const syncResult = await getMailboxProvider("gmail").syncThreads({
+        accessToken: access.accessToken,
+        userEmail: mailbox.email_address,
+        historyId: mailbox.last_history_id ?? undefined,
+      });
+
+      for (const thread of syncResult.threads) {
+        const latestMessage = [...thread.messages].sort(
+          (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime(),
+        )[0];
+        const { data: existingThread } = await supabase
+          .from("message_threads")
+          .select("id, campaign_contact_id")
+          .eq("gmail_thread_id", thread.gmailThreadId)
+          .maybeSingle();
+
+        const { data: rawThreadRecord, error: threadError } = await supabase
+          .from("message_threads")
+          .upsert({
+            workspace_id: mailbox.workspace_id,
+            campaign_contact_id:
+              (existingThread as { campaign_contact_id?: string | null } | null)?.campaign_contact_id ?? null,
+            gmail_thread_id: thread.gmailThreadId,
+            subject: latestMessage?.subject ?? null,
+            snippet:
+              latestMessage?.snippet ??
+              latestMessage?.bodyText?.slice(0, 120) ??
+              latestMessage?.subject ??
+              null,
+            latest_message_at: latestMessage?.sentAt ?? new Date().toISOString(),
+          })
+          .select("id, campaign_contact_id")
+          .single();
+
+        if (threadError) {
+          throw threadError;
+        }
+
+        const threadRecord = rawThreadRecord as {
+          id: string;
+          campaign_contact_id?: string | null;
+        };
+
+        for (const message of thread.messages) {
+          await supabase.from("thread_messages").upsert({
+            gmail_thread_id: thread.gmailThreadId,
+            gmail_message_id: message.gmailMessageId,
+            direction: message.direction,
+            from_email: message.fromEmail,
+            to_emails: message.toEmails,
+            subject: message.subject,
+            snippet: message.snippet,
+            body_text: message.bodyText,
+            body_html: message.bodyHtml,
+            headers_jsonb: message.headers,
+            sent_at: message.sentAt,
+          });
+
+          if (message.direction === "inbound" && threadRecord.campaign_contact_id) {
+            inboundMessages += 1;
+            await supabase
+              .from("campaign_contacts")
+              .update({
+                status: "replied",
+                replied_at: message.sentAt,
+                next_due_at: null,
+              })
+              .eq("id", threadRecord.campaign_contact_id);
+          }
+        }
+
+        syncedThreads += 1;
+      }
+
+      await supabase
+        .from("gmail_accounts")
+        .update({
+          health_status: "active",
+          last_history_id: syncResult.historyId ?? mailbox.last_history_id ?? null,
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq("id", mailbox.id);
+    } catch (error) {
+      console.error("Failed to sync mailbox", mailbox.email_address, error);
+      await supabase
+        .from("gmail_accounts")
+        .update({
+          health_status: "needs_reauth",
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq("id", mailbox.id);
+      mailboxErrors += 1;
+    }
+  }
+
+  return { syncedThreads, inboundMessages, mailboxErrors };
 }

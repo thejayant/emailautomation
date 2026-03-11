@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header";
+import { ManualContactForm } from "@/components/forms/manual-contact-form";
 import { SimpleDataTable } from "@/components/data-table/simple-data-table";
 import { Badge } from "@/components/ui/badge";
 import { getWorkspaceContext } from "@/lib/db/workspace";
@@ -21,11 +22,13 @@ export default async function ContactsPage() {
       <PageHeader
         eyebrow="Contacts"
         title="Unified leads table"
-        description="Workspace-scoped contacts from CSV/XLSX, Sheets, and future CRM adapters."
+        description="Workspace-scoped contacts from manual entry, CSV/XLSX, Sheets, and future CRM adapters."
       />
+      <ManualContactForm refreshOnSuccess />
       <SimpleDataTable
         title="Contacts"
         rows={contacts}
+        emptyLabel="No contacts yet. Add one manually or import a file."
         columns={[
           { key: "email", header: "Email" },
           {

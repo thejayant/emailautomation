@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ type Thread = {
 };
 
 export function ThreadViewer({ threads }: { threads: Thread[] }) {
+  const router = useRouter();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(threads[0]?.id ?? null);
   const [draft, setDraft] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -101,6 +103,7 @@ export function ThreadViewer({ threads }: { threads: Thread[] }) {
                   }
 
                   setDraft("");
+                  router.refresh();
                   toast.success("Reply sent");
                 });
               }}

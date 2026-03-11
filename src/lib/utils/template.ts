@@ -16,3 +16,14 @@ export function renderTemplate(template: string, context: TemplateContext) {
     return value == null ? "" : String(value);
   });
 }
+
+export function previewRenderedTemplate(input: {
+  subjectTemplate: string;
+  bodyTemplate: string;
+  contact: TemplateContext;
+}) {
+  return {
+    subject: renderTemplate(input.subjectTemplate, input.contact),
+    body: renderTemplate(input.bodyTemplate, input.contact),
+  };
+}

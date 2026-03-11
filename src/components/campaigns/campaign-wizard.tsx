@@ -1,11 +1,13 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
+import type { ContactRecord } from "@/lib/types/contact";
 import { campaignLaunchSchema } from "@/lib/zod/schemas";
+import { ManualContactForm } from "@/components/forms/manual-contact-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,10 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 
 type WizardProps = {
   gmailAccounts: Array<{ id: string; email_address: string }>;
-  contacts: Array<{ id: string; email: string; company?: string | null }>;
+  contacts: ContactRecord[];
 };
 
 export function CampaignWizard({ gmailAccounts, contacts }: WizardProps) {
+  const [availableContacts, setAvailableContacts] = useState(contacts);
   const [isPending, startTransition] = useTransition();
   const form = useForm<z.input<typeof campaignLaunchSchema>>({
     resolver: zodResolver(campaignLaunchSchema),
@@ -41,27 +44,70 @@ export function CampaignWizard({ gmailAccounts, contacts }: WizardProps) {
     name: "targetContactIds",
   }) ?? [];
 
-  const onSubmit = form.handleSubmit((values) => {
-    startTransition(async () => {
-      const response = await fetch("/api/campaigns/launch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        toast.error(error?.error ?? "Failed to launch campaign");
-        return;
-      }
-
-      const payload = await response.json();
-      toast.success("Campaign launched");
-      window.location.href = `/campaigns/${payload.id}`;
+  function handleContactCreated(contact: ContactRecord) {
+    setAvailableContacts((current) => [contact, ...current.filter((item) => item.id !== contact.id)]);
+    form.setValue("targetContactIds", [...new Set([...form.getValues("targetContactIds"), contact.id])], {
+      shouldDirty: true,
+      shouldValidate: true,
     });
-  });
+  }
+
+  function submitCampaign(sendNow: boolean) {
+    return form.handleSubmit((values) => {
+      startTransition(async () => {
+        const response = await fetch("/api/campaigns/launch", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          toast.error(payload?.error ?? "Failed to launch campaign");
+          return;
+        }
+
+        const campaignId = payload?.id as string | undefined;
+
+        if (!campaignId) {
+          toast.error("Campaign was created without a valid ID.");
+          return;
+        }
+
+        if (!sendNow) {
+          toast.success("Campaign launched");
+          window.location.href = `/campaigns/${campaignId}`;
+          return;
+        }
+
+        const sendResponse = await fetch("/api/campaigns/send-now", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ campaignId }),
+        });
+        const sendPayload = await sendResponse.json().catch(() => null);
+
+        if (!sendResponse.ok) {
+          toast.error(typeof sendPayload?.error === "string" ? sendPayload.error : "Campaign created, but send now failed");
+          window.location.href = `/campaigns/${campaignId}`;
+          return;
+        }
+
+        const processed = Number(sendPayload?.processed ?? 0);
+        toast.success(
+          processed > 0
+            ? `Campaign launched and sent to ${processed} contact${processed === 1 ? "" : "s"}.`
+            : "Campaign launched. No contacts were ready to send yet.",
+        );
+        window.location.href = `/campaigns/${campaignId}`;
+      });
+    })();
+  }
 
   return (
     <Card className="border-border/60 bg-card/90">
@@ -69,7 +115,13 @@ export function CampaignWizard({ gmailAccounts, contacts }: WizardProps) {
         <CardTitle>Campaign builder</CardTitle>
       </CardHeader>
       <CardContent>
-        <form className="grid gap-8" onSubmit={onSubmit}>
+        <form
+          className="grid gap-8"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitCampaign(false);
+          }}
+        >
           <section className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="campaignName">Campaign name</Label>
@@ -91,34 +143,57 @@ export function CampaignWizard({ gmailAccounts, contacts }: WizardProps) {
             </div>
           </section>
 
-          <section className="grid gap-4">
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
             <div className="grid gap-2">
-              <Label>Target contacts</Label>
+              <div className="flex items-center justify-between gap-4">
+                <Label>Target contacts</Label>
+                <span className="text-xs text-muted-foreground">{targetContactIds.length} selected</span>
+              </div>
               <div className="grid gap-2 rounded-[28px] border border-border/60 bg-background/60 p-4">
-                {contacts.map((contact) => (
-                  <label key={contact.id} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="checkbox"
-                      value={contact.id}
-                      checked={targetContactIds.includes(contact.id)}
-                      onChange={(event) => {
-                        const current = form.getValues("targetContactIds");
-                        form.setValue(
-                          "targetContactIds",
-                          event.target.checked
-                            ? [...current, contact.id]
-                            : current.filter((value) => value !== contact.id),
-                        );
-                      }}
-                    />
-                    <span>
-                      {contact.email}
-                      {contact.company ? ` · ${contact.company}` : ""}
-                    </span>
-                  </label>
-                ))}
+                {availableContacts.length ? (
+                  availableContacts.map((contact) => (
+                    <label
+                      key={contact.id}
+                      className="flex items-start gap-3 rounded-2xl px-2 py-2 text-sm hover:bg-muted/30"
+                    >
+                      <input
+                        type="checkbox"
+                        value={contact.id}
+                        checked={targetContactIds.includes(contact.id)}
+                        onChange={(event) => {
+                          const current = form.getValues("targetContactIds");
+                          form.setValue(
+                            "targetContactIds",
+                            event.target.checked
+                              ? [...current, contact.id]
+                              : current.filter((value) => value !== contact.id),
+                            { shouldDirty: true, shouldValidate: true },
+                          );
+                        }}
+                      />
+                      <span className="grid gap-1">
+                        <span className="font-medium">{contact.email}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "No name"}
+                          {contact.company ? ` - ${contact.company}` : ""}
+                        </span>
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center text-sm text-muted-foreground">
+                    No contacts yet. Add one manually here or import contacts first.
+                  </div>
+                )}
               </div>
             </div>
+            <ManualContactForm
+              title="Add contact inline"
+              description="Create a contact without leaving the campaign builder. New contacts are selected automatically."
+              submitLabel="Add and select"
+              onCreated={handleContactCreated}
+              asForm={false}
+            />
           </section>
 
           <section className="grid gap-4 md:grid-cols-4">
@@ -164,9 +239,14 @@ export function CampaignWizard({ gmailAccounts, contacts }: WizardProps) {
               </div>
             </div>
           </section>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Launching..." : "Launch campaign"}
-          </Button>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button type="button" variant="outline" disabled={isPending} onClick={() => void submitCampaign(true)}>
+              {isPending ? "Launching..." : "Launch and send now"}
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Launching..." : "Launch campaign"}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

@@ -46,10 +46,15 @@ export const env = parsed.success
       FOLLOW_UP_DELAY_DAYS: 2,
     };
 
+function isPlaceholderSecret(value?: string) {
+  return Boolean(value && /^(your-|replace-me|changeme)/i.test(value));
+}
+
 export const isSupabaseConfigured = Boolean(
   env.NEXT_PUBLIC_SUPABASE_URL &&
     (env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) &&
-    env.SUPABASE_SERVICE_ROLE_KEY,
+    env.SUPABASE_SERVICE_ROLE_KEY &&
+    !isPlaceholderSecret(env.SUPABASE_SERVICE_ROLE_KEY),
 );
 
 export const supabaseBrowserKey =
@@ -65,7 +70,7 @@ export const isGoogleConfigured = Boolean(
 export function requireSupabaseConfiguration() {
   if (!isSupabaseConfigured) {
     throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY.",
+      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL, a Supabase browser key, and a real SUPABASE_SERVICE_ROLE_KEY.",
     );
   }
 }
