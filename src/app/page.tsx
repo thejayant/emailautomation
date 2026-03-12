@@ -393,6 +393,13 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <footer className="marketing-footer px-6 py-8 md:px-10 lg:px-14">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 border-t border-[#e7d6e3] pt-6 text-sm text-[#6f6882]">
+          <p>OutboundFlow</p>
+          <p>Built by the Cibirix SEO team</p>
+        </div>
+      </footer>
     </main>
   );
 }

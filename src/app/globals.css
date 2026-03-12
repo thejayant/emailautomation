@@ -228,6 +228,10 @@ select {
     linear-gradient(180deg, #fffafc 0%, #fff7f2 100%);
 }
 
+.marketing-footer {
+  background: linear-gradient(180deg, #fff7f2 0%, #fffdfb 100%);
+}
+
 .marketing-light-card {
   border-radius: 1.75rem;
   border: 1px solid rgba(109, 90, 131, 0.12);
