@@ -38,6 +38,19 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+type ImportContactPayload = {
+  workspace_id: string;
+  owner_user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  company: string | null;
+  website: string | null;
+  job_title: string | null;
+  source: "csv" | "xlsx" | "google_sheets";
+  custom_fields_jsonb: Record<string, string | null>;
+};
+
 export async function listContacts(workspaceId: string) {
   requireSupabaseConfiguration();
 
@@ -129,6 +142,11 @@ export async function processImportFile(input: {
   sourceType: "csv" | "xlsx" | "google_sheets";
 }) {
   const rows = await parseImportFile(input.fileName, input.fileBuffer);
+
+  if (!rows.length) {
+    throw new Error("No rows found in the import file.");
+  }
+
   requireSupabaseConfiguration();
 
   const supabase = createAdminSupabaseClient();
@@ -162,33 +180,89 @@ export async function processImportFile(input: {
 
   await supabase.from("import_rows").insert(rowInserts);
 
-  const contactInserts = rows
+  const mappedRows = rows
     .map(mapImportRow)
-    .filter((row): row is NonNullable<ReturnType<typeof mapImportRow>> => Boolean(row))
-    .map((row) => ({
-      workspace_id: input.workspaceId,
-      owner_user_id: input.userId,
-      email: row.email!,
-      first_name: row.first_name,
-      last_name: row.last_name,
-      company: row.company,
-      website: row.website,
-      job_title: row.job_title,
-      source: input.sourceType,
-      custom_fields_jsonb: row.custom_fields_jsonb,
-    }));
+    .filter((row): row is NonNullable<ReturnType<typeof mapImportRow>> => Boolean(row));
 
-  if (contactInserts.length) {
-    await supabase.from("contacts").upsert(contactInserts, {
-      onConflict: "workspace_id,email",
-    });
+  const dedupedContacts = Array.from(
+    mappedRows.reduce((accumulator, row) => {
+      accumulator.set(normalizeEmail(String(row.email)), {
+        workspace_id: input.workspaceId,
+        owner_user_id: input.userId,
+        email: normalizeEmail(String(row.email)),
+        first_name: row.first_name,
+        last_name: row.last_name,
+        company: row.company,
+        website: row.website,
+        job_title: row.job_title,
+        source: input.sourceType,
+        custom_fields_jsonb: row.custom_fields_jsonb,
+      });
+      return accumulator;
+    }, new Map<string, ImportContactPayload>()),
+  ).map(([, value]) => value);
+
+  if (dedupedContacts.length) {
+    const emails = dedupedContacts.map((contact) => contact.email);
+    const { data: existingContacts, error: existingContactsError } = await supabase
+      .from("contacts")
+      .select("id, email")
+      .eq("workspace_id", input.workspaceId)
+      .in("email", emails);
+
+    if (existingContactsError) {
+      throw existingContactsError;
+    }
+
+    const existingByEmail = new Map(
+      ((existingContacts as Array<{ id: string; email: string }> | null) ?? []).map((contact) => [
+        normalizeEmail(contact.email),
+        contact.id,
+      ]),
+    );
+
+    const contactsToInsert = dedupedContacts.filter((contact) => !existingByEmail.has(contact.email));
+    const contactsToUpdate = dedupedContacts.filter((contact) => existingByEmail.has(contact.email));
+
+    if (contactsToInsert.length) {
+      const { error: insertError } = await supabase.from("contacts").insert(contactsToInsert);
+
+      if (insertError) {
+        throw insertError;
+      }
+    }
+
+    for (const contact of contactsToUpdate) {
+      const existingContactId = existingByEmail.get(contact.email);
+
+      if (!existingContactId) {
+        continue;
+      }
+
+      const { error: updateError } = await supabase
+        .from("contacts")
+        .update({
+          first_name: contact.first_name,
+          last_name: contact.last_name,
+          company: contact.company,
+          website: contact.website,
+          job_title: contact.job_title,
+          source: contact.source,
+          custom_fields_jsonb: contact.custom_fields_jsonb,
+        })
+        .eq("id", existingContactId);
+
+      if (updateError) {
+        throw updateError;
+      }
+    }
   }
 
   await supabase
     .from("imports")
     .update({
       status: "processed",
-      imported_count: contactInserts.length,
+      imported_count: dedupedContacts.length,
     })
     .eq("id", importRecord.id);
 
@@ -196,7 +270,7 @@ export async function processImportFile(input: {
     importId: importRecord.id,
     headers: Object.keys(rows[0] ?? {}),
     totalRows: rows.length,
-    importedCount: contactInserts.length,
+    importedCount: dedupedContacts.length,
   };
 }
 
@@ -210,6 +284,12 @@ export async function importFromGoogleSheet(input: {
 
   if (!response.ok) {
     throw new Error("Failed to fetch Google Sheet as CSV.");
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("text/html")) {
+    throw new Error("Google Sheet is not public or could not be exported as CSV.");
   }
 
   const buffer = await response.arrayBuffer();

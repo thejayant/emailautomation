@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { LogOut, Sparkles } from "lucide-react";
 import { headers } from "next/headers";
-import { signOutAction } from "@/lib/auth/actions";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Button } from "@/components/ui/button";
 
@@ -29,7 +28,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               <p className="mt-2 text-sm leading-6 text-sidebar-muted">
                 Gmail only, one follow-up after two days, workspace-safe sending caps.
               </p>
-              <form action={signOutAction} className="mt-4">
+              <form action="/api/auth/sign-out" method="post" className="mt-4">
                 <Button type="submit" variant="secondary" className="w-full justify-center">
                   <LogOut className="size-4" />
                   Sign out
