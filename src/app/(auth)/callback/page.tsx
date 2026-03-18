@@ -1,10 +1,12 @@
+import { productContent } from "@/content/product";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { CallbackStatus } from "@/components/auth/callback-status";
 
 export default function CallbackPage() {
   return (
     <AuthShell
-      caption="Completing your authentication."
+      badge={productContent.auth.callback.badge}
+      caption={productContent.auth.callback.caption}
     >
       <div className="auth-card grid gap-6 p-7 sm:p-8">
         <CallbackStatus />

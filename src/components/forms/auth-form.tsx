@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, MoveRight } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { productContent } from "@/content/product";
 import { getBrowserPostAuthRedirectPath } from "@/lib/auth/redirects";
+import {
+  clearBrowserSupabaseAuthState,
+  recoverFromStaleBrowserSession,
+  STALE_BROWSER_SESSION_MESSAGE,
+} from "@/lib/supabase/browser-auth";
 import { createClient } from "@/lib/supabase/client";
 import { authSchema, emailOnlySchema } from "@/lib/zod/schemas";
 import { Button } from "@/components/ui/button";
@@ -29,6 +35,10 @@ const passwordOnlySchema = z.object({
 
 function getFriendlyAuthError(error: unknown) {
   const message = error instanceof Error ? error.message : "Request failed";
+
+  if (/invalid refresh token/i.test(message) || /refresh token not found/i.test(message)) {
+    return STALE_BROWSER_SESSION_MESSAGE;
+  }
 
   if (message.includes("Unsupported provider")) {
     return "Google sign-in is not enabled in Supabase yet. Enable the Google auth provider in your Supabase project settings, then try again.";
@@ -82,7 +92,14 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
   });
-  const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    if (mode === "update-password") {
+      return;
+    }
+
+    clearBrowserSupabaseAuthState();
+  }, [mode]);
 
   useEffect(() => {
     if (mode !== "update-password") {
@@ -99,11 +116,16 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         return;
       }
 
+      clearBrowserSupabaseAuthState({ preserveCodeVerifier: true });
+      const supabase = createClient({ isSingleton: false });
       const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-      if (error && isActive) {
-        toast.error(error.message);
+      if (!error || !isActive) {
+        return;
       }
+
+      await recoverFromStaleBrowserSession(supabase, error, { preserveCodeVerifier: true });
+      toast.error(getFriendlyAuthError(error));
     }
 
     void prepareRecoverySession();
@@ -111,11 +133,19 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     return () => {
       isActive = false;
     };
-  }, [mode, supabase]);
+  }, [mode]);
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
+      let supabase: ReturnType<typeof createClient> | null = null;
+
       try {
+        if (mode !== "update-password") {
+          clearBrowserSupabaseAuthState();
+        }
+
+        supabase = createClient({ isSingleton: false });
+
         if (mode === "sign-in") {
           const {
             data: { user },
@@ -179,6 +209,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
         toast.success("Password reset email sent.");
       } catch (error) {
+        await recoverFromStaleBrowserSession(supabase, error);
         toast.error(getFriendlyAuthError(error));
       }
     });
@@ -186,6 +217,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
   async function handleGoogleAuth() {
     setIsGooglePending(true);
+    clearBrowserSupabaseAuthState();
+    const supabase = createClient({ isSingleton: false });
 
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -203,6 +236,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         throw error;
       }
     } catch (error) {
+      await recoverFromStaleBrowserSession(supabase, error);
       toast.error(getFriendlyAuthError(error));
       setIsGooglePending(false);
     }
@@ -210,30 +244,12 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
   const copy: AuthCopy =
     mode === "sign-in"
-      ? {
-          title: "Sign in with email",
-          description: "Access your workspace and continue where you left off.",
-          submitLabel: "Sign in",
-          googleLabel: "Continue with Google",
-        }
+      ? productContent.auth.signIn
       : mode === "sign-up"
-        ? {
-            title: "Create your account",
-            description: "Start with email or Google in a few seconds.",
-            submitLabel: "Create account",
-            googleLabel: "Continue with Google",
-          }
+        ? productContent.auth.signUp
         : mode === "update-password"
-          ? {
-              title: "Set a new password",
-              description: "Choose a secure password to finish recovery.",
-              submitLabel: "Update password",
-            }
-          : {
-              title: "Reset your password",
-              description: "We will send a reset link to your email.",
-              submitLabel: "Send reset link",
-            };
+          ? productContent.auth.updatePassword
+          : productContent.auth.forgotPassword;
 
   const emailError = form.formState.errors.email?.message;
   const passwordError = form.formState.errors.password?.message;
@@ -241,14 +257,14 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   return (
     <div className="auth-card grid gap-6 p-7 sm:p-9">
       <div className="grid gap-3 text-center">
-        <div className="mx-auto flex h-[4.6rem] w-[4.6rem] items-center justify-center rounded-[24px] border border-white/70 bg-white/90 text-[#1d3342] shadow-[0_18px_42px_rgba(31,57,82,0.12)]">
+        <div className="glass-control mx-auto flex h-[4.8rem] w-[4.8rem] items-center justify-center rounded-[1.65rem] text-foreground">
           <AuthGlyph mode={mode} />
         </div>
         <div className="space-y-2">
-          <h2 className="text-[2.15rem] font-semibold tracking-[-0.06em] text-[#163548]">
+          <h2 className="text-[2.15rem] font-semibold tracking-[-0.06em] text-foreground">
             {copy.title}
           </h2>
-          <p className="mx-auto max-w-[24rem] text-[1.05rem] leading-8 text-[#738797]">
+          <p className="mx-auto max-w-[24rem] text-[1.02rem] leading-8 text-muted-foreground">
             {copy.description}
           </p>
         </div>
@@ -258,11 +274,11 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {mode !== "update-password" ? (
           <div className="grid gap-2">
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[#91a0ac]" />
+              <Mail className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id={`${mode}-email`}
                 type="email"
-                className="auth-input h-14 rounded-[18px] border-0 bg-[#f3f6f8] pl-11 pr-4 shadow-none"
+                className="auth-input h-14 rounded-[1.2rem] border-0 pl-11 pr-4 shadow-none"
                 placeholder="Email"
                 autoComplete="email"
                 {...form.register("email")}
@@ -275,11 +291,11 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {mode !== "forgot-password" ? (
           <div className="grid gap-2">
             <div className="relative">
-              <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[#91a0ac]" />
+              <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id={`${mode}-password`}
                 type={showPassword ? "text" : "password"}
-                className="auth-input h-14 rounded-[18px] border-0 bg-[#f3f6f8] pl-11 pr-12 shadow-none"
+                className="auth-input h-14 rounded-[1.2rem] border-0 pl-11 pr-12 shadow-none"
                 placeholder={
                   mode === "update-password" ? "New password" : "Password"
                 }
@@ -294,7 +310,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-[#7a92a1] transition hover:text-[#163548]"
+                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-muted-foreground transition hover:text-foreground"
                 onClick={() => setShowPassword((current) => !current)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -305,7 +321,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               <div className="text-right">
                 <Link
                   href="/forgot-password"
-                  className="text-sm font-medium text-[#2f3d48] transition hover:text-[#163548]"
+                  className="text-sm font-medium text-foreground transition hover:text-primary"
                 >
                   Forgot password?
                 </Link>
@@ -319,7 +335,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           type="submit"
           size="lg"
           disabled={isPending || isGooglePending}
-          className="mt-1 h-13 rounded-[18px] bg-[#17181f] text-base text-white shadow-[0_14px_26px_rgba(23,24,31,0.2)] hover:bg-[#20232b]"
+          className="mt-1 h-13 rounded-[1.2rem] text-base"
         >
           {isPending ? "Working..." : copy.submitLabel}
           {!isPending ? <MoveRight className="size-4" /> : null}
@@ -328,17 +344,17 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
       {copy.googleLabel ? (
         <div className="grid gap-4">
-          <div className="auth-divider flex items-center gap-3 text-xs text-[#97a9b6]">
-            <span className="h-px flex-1 border-t border-dashed border-[#dce5eb]" />
+          <div className="auth-divider flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 border-t border-dashed border-white/72" />
             Or sign in with
-            <span className="h-px flex-1 border-t border-dashed border-[#dce5eb]" />
+            <span className="h-px flex-1 border-t border-dashed border-white/72" />
           </div>
 
           <Button
             type="button"
             disabled={isPending || isGooglePending}
             variant="outline"
-            className="h-12 rounded-[18px] border border-[#e6edf2] bg-white text-[#163548] shadow-none hover:bg-[#f9fbfc]"
+            className="h-12 rounded-[1.2rem]"
             onClick={() => {
               void handleGoogleAuth();
             }}

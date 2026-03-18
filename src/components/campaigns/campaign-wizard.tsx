@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import type { Control, UseFormRegister, UseFormSetValue } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
+import { productContent } from "@/content/product";
 import type { ContactRecord } from "@/lib/types/contact";
 import { previewRenderedTemplate } from "@/lib/utils/template";
 import { campaignLaunchSchema } from "@/lib/zod/schemas";
@@ -59,10 +61,10 @@ function getTemplateSnippet(template: {
   body_html_template?: string | null;
 }) {
   if (template.body_html_template) {
-    return "Designed HTML template with rendered layout and text fallback.";
+    return productContent.templates.table.htmlPreviewLabel;
   }
 
-  return template.body_template.slice(0, 120) || "No preview yet.";
+  return template.body_template.slice(0, 120) || productContent.shared.noBodyLabel;
 }
 
 function CampaignStepEditor({
@@ -76,6 +78,7 @@ function CampaignStepEditor({
   templates,
 }: StepEditorProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const stepCopy = productContent.campaigns.wizard.stepEditor;
   const mode = useWatch({ control, name: `${namePrefix}.mode` as const });
   const subject = useWatch({ control, name: `${namePrefix}.subject` as const });
   const body = useWatch({ control, name: `${namePrefix}.body` as const });
@@ -97,28 +100,30 @@ function CampaignStepEditor({
   );
 
   return (
-    <Card className="border-border/60 bg-card/90">
+    <Card>
       <CardHeader className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <CardTitle>{title}</CardTitle>
-          <Badge variant="neutral">{mode === "html" ? "HTML mode" : "Text mode"}</Badge>
+          <Badge variant="neutral">
+            {mode === "html" ? stepCopy.htmlModeLabel : stepCopy.textModeLabel}
+          </Badge>
         </div>
         <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)]">
         <div className="grid gap-4">
           {templates.length ? (
-            <div className="grid gap-3 rounded-[28px] border border-border/60 bg-background/60 p-4">
+            <div className="glass-control grid gap-3 rounded-[1.75rem] p-4">
               <div className="flex items-center justify-between gap-3">
-                <Label htmlFor={`${namePrefix}-template`}>Saved template</Label>
+                <Label htmlFor={`${namePrefix}-template`}>{stepCopy.savedTemplateLabel}</Label>
                 <span className="text-xs text-muted-foreground">
-                  Selecting one will apply it immediately
+                  {stepCopy.savedTemplateHint}
                 </span>
               </div>
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
                 <select
                   id={`${namePrefix}-template`}
-                  className="h-11 flex-1 rounded-2xl border border-border bg-white/75 px-4 text-sm"
+                  className="glass-control h-12 flex-1 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
                   value={selectedTemplateId}
                   onChange={(event) => {
                     const nextId = event.target.value;
@@ -146,24 +151,31 @@ function CampaignStepEditor({
                       shouldDirty: true,
                       shouldValidate: true,
                     });
-                    toast.success(`Loaded ${nextTemplate.name}`);
+                    toast.success(stepCopy.loadedTemplateMessage(nextTemplate.name));
                   }}
                 >
-                  <option value="">Choose a template</option>
+                  <option value="">{stepCopy.emptyTemplateOption}</option>
                   {templates.map((template) => (
                     <option key={template.id} value={template.id}>
-                      {template.name} {template.body_html_template ? "(HTML)" : "(Text)"}
+                      {template.name}{" "}
+                      {template.body_html_template
+                        ? `(${stepCopy.htmlModeLabel})`
+                        : `(${stepCopy.textModeLabel})`}
                     </option>
                   ))}
                 </select>
                 <div className="flex items-center gap-2">
                   <Badge variant="neutral">
-                    {selectedTemplate?.body_html_template ? "HTML" : selectedTemplate ? "Text" : `${templates.length} saved`}
+                    {selectedTemplate?.body_html_template
+                      ? stepCopy.htmlModeLabel
+                      : selectedTemplate
+                        ? stepCopy.textModeLabel
+                        : stepCopy.savedCountLabel(templates.length)}
                   </Badge>
                 </div>
               </div>
               {selectedTemplate ? (
-                <div className="rounded-3xl border border-border/60 bg-card/80 px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-[1.5rem] border border-white/50 bg-white/52 px-4 py-3 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">{selectedTemplate.subject_template}</p>
                   <p className="mt-1 leading-6">{getTemplateSnippet(selectedTemplate)}</p>
                 </div>
@@ -171,25 +183,25 @@ function CampaignStepEditor({
             </div>
           ) : null}
           <div className="grid gap-2">
-            <Label>Composer mode</Label>
+            <Label>{stepCopy.composerModeLabel}</Label>
             <Tabs
               value={mode ?? "text"}
               onValueChange={(value) => setValue(`${namePrefix}.mode` as const, value as "text" | "html", { shouldDirty: true })}
             >
               <TabsList>
-                <TabsTrigger value="text">Text</TabsTrigger>
-                <TabsTrigger value="html">HTML</TabsTrigger>
+                <TabsTrigger value="text">{stepCopy.textModeLabel}</TabsTrigger>
+                <TabsTrigger value="html">{stepCopy.htmlModeLabel}</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor={`${namePrefix}-subject`}>Subject</Label>
+            <Label htmlFor={`${namePrefix}-subject`}>{stepCopy.subjectLabel}</Label>
             <Input id={`${namePrefix}-subject`} {...register(`${namePrefix}.subject` as const)} />
           </div>
           {mode === "html" ? (
             <>
               <div className="grid gap-2">
-                <Label htmlFor={`${namePrefix}-html`}>HTML body</Label>
+                <Label htmlFor={`${namePrefix}-html`}>{stepCopy.htmlBodyLabel}</Label>
                 <Textarea
                   id={`${namePrefix}-html`}
                   className="min-h-60 font-mono text-xs"
@@ -197,7 +209,7 @@ function CampaignStepEditor({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor={`${namePrefix}-file`}>Import HTML file</Label>
+                <Label htmlFor={`${namePrefix}-file`}>{stepCopy.importHtmlLabel}</Label>
                 <Input
                   id={`${namePrefix}-file`}
                   type="file"
@@ -216,48 +228,54 @@ function CampaignStepEditor({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor={`${namePrefix}-fallback`}>Text fallback</Label>
+                <Label htmlFor={`${namePrefix}-fallback`}>{stepCopy.fallbackLabel}</Label>
                 <Textarea
                   id={`${namePrefix}-fallback`}
                   className="min-h-36"
-                  placeholder="Optional plain-text fallback. Leave blank to auto-generate."
+                  placeholder={stepCopy.fallbackPlaceholder}
                   {...register(`${namePrefix}.body` as const)}
                 />
               </div>
             </>
           ) : (
             <div className="grid gap-2">
-              <Label htmlFor={`${namePrefix}-body`}>Body</Label>
+              <Label htmlFor={`${namePrefix}-body`}>{stepCopy.bodyLabel}</Label>
               <Textarea id={`${namePrefix}-body`} className="min-h-60" {...register(`${namePrefix}.body` as const)} />
             </div>
           )}
         </div>
 
-        <div className="rounded-[28px] border border-border/60 bg-background/70 p-5 lg:sticky lg:top-6 lg:self-start">
+        <div className="glass-control rounded-[1.75rem] p-5 lg:sticky lg:top-6 lg:self-start">
           <Tabs defaultValue="rendered" className="grid gap-4">
             <TabsList className="w-full justify-start">
-              <TabsTrigger value="rendered">Preview</TabsTrigger>
-              <TabsTrigger value="text">Text</TabsTrigger>
+              <TabsTrigger value="rendered">{productContent.shared.previewTab}</TabsTrigger>
+              <TabsTrigger value="text">{productContent.shared.textTab}</TabsTrigger>
             </TabsList>
             <TabsContent value="rendered" className="mt-0">
               <div className="space-y-3">
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Subject</p>
-                <p className="text-base font-semibold">{preview.subject || "No subject yet"}</p>
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Body</p>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  {stepCopy.previewSubjectLabel}
+                </p>
+                <p className="text-base font-semibold">
+                  {preview.subject || productContent.shared.noSubjectLabel}
+                </p>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  {stepCopy.previewBodyLabel}
+                </p>
                 {mode === "html" && preview.bodyHtml ? (
-                  <div className="overflow-hidden rounded-3xl border border-border/60 bg-white p-4 text-sm leading-6 text-slate-700">
+                  <div className="overflow-hidden rounded-[1.5rem] border border-white/65 bg-white p-4 text-sm leading-6 text-slate-700">
                     <SafeHtmlContent html={preview.bodyHtml} />
                   </div>
                 ) : (
-                  <div className="rounded-3xl border border-border/60 bg-background/80 p-4 text-sm leading-6 text-muted-foreground whitespace-pre-wrap">
-                    {preview.body || "No body yet"}
+                  <div className="rounded-[1.5rem] border border-white/60 bg-white/54 p-4 text-sm leading-6 text-muted-foreground whitespace-pre-wrap">
+                    {preview.body || productContent.shared.noBodyLabel}
                   </div>
                 )}
               </div>
             </TabsContent>
             <TabsContent value="text" className="mt-0">
-              <div className="rounded-3xl border border-border/60 bg-background/80 p-4 text-sm leading-6 text-muted-foreground whitespace-pre-wrap">
-                {preview.textFallback || "No text preview yet"}
+              <div className="rounded-[1.5rem] border border-white/60 bg-white/54 p-4 text-sm leading-6 text-muted-foreground whitespace-pre-wrap">
+                {preview.textFallback || productContent.shared.noTextPreviewLabel}
               </div>
             </TabsContent>
           </Tabs>
@@ -275,6 +293,8 @@ export function CampaignWizard({
   campaignId,
   initialValues,
 }: WizardProps) {
+  const wizardCopy = productContent.campaigns.wizard;
+  const hasMailbox = gmailAccounts.length > 0;
   const [availableContacts, setAvailableContacts] = useState(contacts);
   const [contactQuery, setContactQuery] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -366,25 +386,25 @@ export function CampaignWizard({
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-          toast.error(payload?.error ?? `Failed to ${mode === "edit" ? "update" : "launch"} campaign`);
+          toast.error(payload?.error ?? (mode === "edit" ? wizardCopy.toasts.updateError : wizardCopy.toasts.launchError));
           return;
         }
 
         const resolvedCampaignId = (payload?.id as string | undefined) ?? campaignId;
 
         if (!resolvedCampaignId) {
-          toast.error("Campaign was saved without a valid ID.");
+          toast.error(wizardCopy.toasts.missingCampaignId);
           return;
         }
 
         if (mode === "edit") {
-          toast.success("Campaign updated");
+          toast.success(wizardCopy.toasts.updated);
           window.location.href = `/campaigns/${resolvedCampaignId}`;
           return;
         }
 
         if (!sendNow) {
-          toast.success("Campaign launched");
+          toast.success(wizardCopy.toasts.launched);
           window.location.href = `/campaigns/${resolvedCampaignId}`;
           return;
         }
@@ -399,7 +419,9 @@ export function CampaignWizard({
         const sendPayload = await sendResponse.json().catch(() => null);
 
         if (!sendResponse.ok) {
-          toast.error(typeof sendPayload?.error === "string" ? sendPayload.error : "Campaign created, but send now failed");
+          toast.error(
+            typeof sendPayload?.error === "string" ? sendPayload.error : wizardCopy.toasts.sendNowFailed,
+          );
           window.location.href = `/campaigns/${resolvedCampaignId}`;
           return;
         }
@@ -407,8 +429,8 @@ export function CampaignWizard({
         const processed = Number(sendPayload?.processed ?? 0);
         toast.success(
           processed > 0
-            ? `Campaign launched and sent to ${processed} contact${processed === 1 ? "" : "s"}.`
-            : "Campaign launched. No contacts were ready to send yet.",
+            ? wizardCopy.toasts.launchedAndSent(processed)
+            : wizardCopy.toasts.launchedNoReadyContacts,
         );
         window.location.href = `/campaigns/${resolvedCampaignId}`;
       });
@@ -416,9 +438,9 @@ export function CampaignWizard({
   }
 
   return (
-    <Card className="border-border/60 bg-card/90">
+    <Card>
       <CardHeader>
-        <CardTitle>{mode === "edit" ? "Edit campaign" : "Campaign builder"}</CardTitle>
+        <CardTitle>{mode === "edit" ? wizardCopy.title.edit : wizardCopy.title.create}</CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -429,53 +451,69 @@ export function CampaignWizard({
           }}
         >
           <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-[28px] border border-border/60 bg-background/70 p-5">
+            <div className="glass-control rounded-[1.75rem] p-5">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                Audience
+                {wizardCopy.summary.audience.eyebrow}
               </p>
               <p className="mt-3 text-3xl font-semibold text-foreground">{targetContactIds.length}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                contacts selected for this campaign
+                {wizardCopy.summary.audience.description}
               </p>
             </div>
-            <div className="rounded-[28px] border border-border/60 bg-background/70 p-5">
+            <div className="glass-control rounded-[1.75rem] p-5">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                Templates
+                {wizardCopy.summary.templates.eyebrow}
               </p>
               <p className="mt-3 text-3xl font-semibold text-foreground">{templates.length}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                saved text or HTML templates ready to apply
+                {wizardCopy.summary.templates.description}
               </p>
             </div>
-            <div className="rounded-[28px] border border-border/60 bg-background/70 p-5">
+            <div className="glass-control rounded-[1.75rem] p-5">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                Mailboxes
+                {wizardCopy.summary.mailboxes.eyebrow}
               </p>
               <p className="mt-3 text-3xl font-semibold text-foreground">{gmailAccounts.length}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                connected senders available for launch
+                {wizardCopy.summary.mailboxes.description}
               </p>
             </div>
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="campaignName">Campaign name</Label>
+              <Label htmlFor="campaignName">{wizardCopy.campaignNameLabel}</Label>
               <Input id="campaignName" {...form.register("campaignName")} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="gmailAccountId">Sender mailbox</Label>
+              <Label htmlFor="gmailAccountId">{wizardCopy.senderLabel}</Label>
               <select
                 id="gmailAccountId"
-                className="h-11 rounded-2xl border border-border bg-white/75 px-4 text-sm"
+                className="glass-control h-12 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
                 {...form.register("gmailAccountId")}
               >
+                {!hasMailbox ? (
+                  <option value="">{wizardCopy.senderEmptyLabel}</option>
+                ) : null}
                 {gmailAccounts.map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.email_address}
                   </option>
                 ))}
               </select>
+              {!hasMailbox ? (
+                <div className="glass-control flex flex-col items-start gap-3 rounded-[1.5rem] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">{wizardCopy.senderHelperTitle}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {wizardCopy.senderHelperDescription}
+                    </p>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/profile">{wizardCopy.senderHelperCta}</Link>
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -483,9 +521,9 @@ export function CampaignWizard({
             <div className="grid gap-2">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="grid gap-1">
-                  <Label htmlFor="contact-search">Target contacts</Label>
+                  <Label htmlFor="contact-search">{wizardCopy.targetContactsLabel}</Label>
                   <span className="text-xs text-muted-foreground">
-                    {targetContactIds.length} selected across the full list
+                    {wizardCopy.targetContactsSummary(targetContactIds.length)}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -500,7 +538,7 @@ export function CampaignWizard({
                       )
                     }
                   >
-                    Select visible
+                    {wizardCopy.selectVisibleLabel}
                   </Button>
                   <Button
                     type="button"
@@ -512,22 +550,22 @@ export function CampaignWizard({
                       })
                     }
                   >
-                    Clear selection
+                    {wizardCopy.clearSelectionLabel}
                   </Button>
                 </div>
               </div>
               <Input
                 id="contact-search"
-                placeholder="Search by email, name, company, title, or tag"
+                placeholder={wizardCopy.searchContactsPlaceholder}
                 value={contactQuery}
                 onChange={(event) => setContactQuery(event.target.value)}
               />
-              <div className="grid max-h-[28rem] gap-2 overflow-auto rounded-[28px] border border-border/60 bg-background/60 p-4">
+              <div className="solid-content grid max-h-[28rem] gap-2 overflow-auto rounded-[1.75rem] p-4">
                 {filteredContacts.length ? (
                   filteredContacts.map((contact) => (
                     <label
                       key={contact.id}
-                      className="flex items-start gap-3 rounded-2xl border border-transparent px-3 py-3 text-sm transition hover:border-border/60 hover:bg-muted/30"
+                      className="flex items-start gap-3 rounded-[1.25rem] border border-transparent px-3 py-3 text-sm transition hover:border-white/65 hover:bg-white/56"
                     >
                       <input
                         type="checkbox"
@@ -547,7 +585,7 @@ export function CampaignWizard({
                       <span className="grid gap-1">
                         <span className="font-medium">{contact.email}</span>
                         <span className="text-xs text-muted-foreground">
-                          {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "No name"}
+                          {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || wizardCopy.noNameLabel}
                           {contact.company ? ` - ${contact.company}` : ""}
                         </span>
                         {(contact.tags ?? []).length ? (
@@ -565,16 +603,16 @@ export function CampaignWizard({
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center text-sm text-muted-foreground">
                     {availableContacts.length
-                      ? "No contacts match this search yet."
-                      : "No contacts yet. Add one manually here or import contacts first."}
+                      ? wizardCopy.noContactsSearchLabel
+                      : wizardCopy.noContactsLabel}
                   </div>
                 )}
               </div>
             </div>
             <ManualContactForm
-              title="Add contact inline"
-              description="Create a contact without leaving the campaign builder. New contacts are selected automatically."
-              submitLabel="Add and select"
+              title={wizardCopy.addInlineTitle}
+              description={wizardCopy.addInlineDescription}
+              submitLabel={wizardCopy.addInlineSubmitLabel}
               onCreated={handleContactCreated}
               asForm={false}
             />
@@ -582,26 +620,26 @@ export function CampaignWizard({
 
           <section className="grid gap-4 md:grid-cols-4">
             <div className="grid gap-2">
-              <Label htmlFor="timezone">Timezone</Label>
+              <Label htmlFor="timezone">{wizardCopy.schedule.timezoneLabel}</Label>
               <Input id="timezone" {...form.register("timezone")} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="sendWindowStart">Start</Label>
+              <Label htmlFor="sendWindowStart">{wizardCopy.schedule.startLabel}</Label>
               <Input id="sendWindowStart" {...form.register("sendWindowStart")} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="sendWindowEnd">End</Label>
+              <Label htmlFor="sendWindowEnd">{wizardCopy.schedule.endLabel}</Label>
               <Input id="sendWindowEnd" {...form.register("sendWindowEnd")} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="dailySendLimit">Daily cap</Label>
+              <Label htmlFor="dailySendLimit">{wizardCopy.schedule.dailyCapLabel}</Label>
               <Input id="dailySendLimit" type="number" {...form.register("dailySendLimit")} />
             </div>
           </section>
 
           <CampaignStepEditor
-            title="Primary email"
-            description="Draft the first touch as text or full HTML. Merge tags like {{first_name}} and {{company}} work in both modes."
+            title={wizardCopy.primaryStep.title}
+            description={wizardCopy.primaryStep.description}
             namePrefix="primaryStep"
             control={form.control}
             register={form.register}
@@ -610,8 +648,8 @@ export function CampaignWizard({
             templates={templates}
           />
           <CampaignStepEditor
-            title="Follow-up"
-            description="This step uses the fixed follow-up delay from your workspace configuration and can have its own HTML mode."
+            title={wizardCopy.followupStep.title}
+            description={wizardCopy.followupStep.description}
             namePrefix="followupStep"
             control={form.control}
             register={form.register}
@@ -622,12 +660,18 @@ export function CampaignWizard({
 
           <div className="flex flex-wrap justify-end gap-3">
             {mode === "create" ? (
-              <Button type="button" variant="outline" disabled={isPending} onClick={() => void submitCampaign(true)}>
-                {isPending ? "Launching..." : "Launch and send now"}
+              <Button type="button" variant="outline" disabled={isPending || !hasMailbox} onClick={() => void submitCampaign(true)}>
+                {isPending ? wizardCopy.actions.pendingCreate : wizardCopy.actions.launchNow}
               </Button>
             ) : null}
-            <Button type="submit" disabled={isPending}>
-              {isPending ? (mode === "edit" ? "Saving..." : "Launching...") : mode === "edit" ? "Save changes" : "Launch campaign"}
+            <Button type="submit" disabled={isPending || !hasMailbox}>
+              {isPending
+                ? mode === "edit"
+                  ? wizardCopy.actions.pendingEdit
+                  : wizardCopy.actions.pendingCreate
+                : mode === "edit"
+                  ? wizardCopy.actions.saveChanges
+                  : wizardCopy.actions.launch}
             </Button>
           </div>
         </form>

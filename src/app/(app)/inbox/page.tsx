@@ -1,6 +1,7 @@
 import { LiveRefresh } from "@/components/layout/live-refresh";
 import { PageHeader } from "@/components/layout/page-header";
 import { ThreadViewer } from "@/components/threads/thread-viewer";
+import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import { listThreads } from "@/services/analytics-service";
 import { syncWorkspaceReplies } from "@/services/gmail-service";
@@ -32,10 +33,10 @@ export default async function InboxPage() {
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Inbox"
-        title="Thread history"
-        description="Normalized Gmail thread sync showing both outbound sends and inbound replies."
-        actions={<LiveRefresh label="Inbox sync every 15s" />}
+        eyebrow={productContent.inbox.header.eyebrow}
+        title={productContent.inbox.header.title}
+        description={productContent.inbox.header.description}
+        actions={<LiveRefresh label={productContent.inbox.header.liveRefreshLabel} />}
       />
       <ThreadViewer threads={threads} />
     </div>

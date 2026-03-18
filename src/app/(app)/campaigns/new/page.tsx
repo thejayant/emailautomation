@@ -1,5 +1,6 @@
 import { CampaignWizard } from "@/components/campaigns/campaign-wizard";
 import { PageHeader } from "@/components/layout/page-header";
+import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import { listTemplates } from "@/services/campaign-service";
 import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
@@ -25,9 +26,9 @@ export default async function NewCampaignPage() {
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Campaign builder"
-        title="Launch a campaign"
-        description="Choose a mailbox, audience, and two-step sequence with text or HTML email content."
+        eyebrow={productContent.campaigns.newCampaign.eyebrow}
+        title={productContent.campaigns.newCampaign.title}
+        description={productContent.campaigns.newCampaign.description}
       />
       <CampaignWizard gmailAccounts={gmailAccounts} contacts={contacts} templates={templates} />
     </div>

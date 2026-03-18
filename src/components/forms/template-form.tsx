@@ -6,6 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
+import { productContent } from "@/content/product";
 import { stripHtmlToText } from "@/lib/utils/html";
 import { previewRenderedTemplate } from "@/lib/utils/template";
 import { templateSchema } from "@/lib/zod/schemas";
@@ -67,12 +68,13 @@ function getApiErrorMessage(error: unknown) {
     }
   }
 
-  return "Failed to save template";
+  return productContent.templates.form.errorMessage;
 }
 
 export function TemplateForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const formCopy = productContent.templates.form;
   const form = useForm<z.infer<typeof templateSchema>>({
     resolver: zodResolver(templateSchema),
     defaultValues: DEFAULT_TEMPLATE_VALUES,
@@ -136,31 +138,31 @@ export function TemplateForm() {
 
       form.reset(DEFAULT_TEMPLATE_VALUES);
       router.refresh();
-      toast.success("Template saved");
+      toast.success(formCopy.successMessage);
     });
   });
 
   return (
-    <Card className="border-border/60 bg-card/90">
+    <Card>
       <CardHeader>
-        <CardTitle>Create template</CardTitle>
+        <CardTitle>{formCopy.title}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <form className="grid gap-4" onSubmit={onSubmit}>
           <div className="grid gap-2">
-            <Label htmlFor="name">Template name</Label>
+            <Label htmlFor="name">{formCopy.nameLabel}</Label>
             <Input id="name" {...form.register("name")} />
             {nameError ? <p className="text-sm text-danger">{nameError}</p> : null}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="subjectTemplate">Subject</Label>
+            <Label htmlFor="subjectTemplate">{formCopy.subjectLabel}</Label>
             <Input id="subjectTemplate" {...form.register("subjectTemplate")} />
             {subjectError ? <p className="text-sm text-danger">{subjectError}</p> : null}
           </div>
           <div className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
-              <Label>Template mode</Label>
-              <Badge variant="neutral">{mode === "html" ? "HTML template" : "Text template"}</Badge>
+              <Label>{formCopy.modeLabel}</Label>
+              <Badge variant="neutral">{mode === "html" ? formCopy.htmlTemplateBadge : formCopy.textTemplateBadge}</Badge>
             </div>
             <Tabs
               value={mode ?? "text"}
@@ -172,15 +174,15 @@ export function TemplateForm() {
               }
             >
               <TabsList>
-                <TabsTrigger value="text">Text</TabsTrigger>
-                <TabsTrigger value="html">HTML</TabsTrigger>
+                <TabsTrigger value="text">{productContent.shared.textTab}</TabsTrigger>
+                <TabsTrigger value="html">{productContent.templates.table.htmlModeLabel}</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
           {mode === "html" ? (
             <>
               <div className="grid gap-2">
-                <Label htmlFor="bodyHtmlTemplate">HTML body</Label>
+                <Label htmlFor="bodyHtmlTemplate">{formCopy.htmlBodyLabel}</Label>
                 <Textarea
                   id="bodyHtmlTemplate"
                   className="min-h-60 font-mono text-xs"
@@ -189,7 +191,7 @@ export function TemplateForm() {
                 {bodyHtmlError ? <p className="text-sm text-danger">{bodyHtmlError}</p> : null}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="template-html-file">Import HTML file</Label>
+                <Label htmlFor="template-html-file">{formCopy.importHtmlLabel}</Label>
                 <Input
                   id="template-html-file"
                   type="file"
@@ -211,11 +213,11 @@ export function TemplateForm() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="bodyTemplate">Text fallback</Label>
+                <Label htmlFor="bodyTemplate">{formCopy.fallbackLabel}</Label>
                 <Textarea
                   id="bodyTemplate"
                   className="min-h-36"
-                  placeholder="Optional plain-text fallback. Leave blank to auto-generate."
+                  placeholder={formCopy.fallbackPlaceholder}
                   {...form.register("bodyTemplate")}
                 />
                 {bodyError ? <p className="text-sm text-danger">{bodyError}</p> : null}
@@ -223,44 +225,44 @@ export function TemplateForm() {
             </>
           ) : (
             <div className="grid gap-2">
-              <Label htmlFor="bodyTemplate">Body</Label>
+              <Label htmlFor="bodyTemplate">{formCopy.bodyLabel}</Label>
               <Textarea id="bodyTemplate" className="min-h-60" {...form.register("bodyTemplate")} />
               {bodyError ? <p className="text-sm text-danger">{bodyError}</p> : null}
             </div>
           )}
           <Button type="submit" disabled={isPending}>
-            {isPending ? "Saving..." : "Save template"}
+            {isPending ? formCopy.savingLabel : formCopy.saveLabel}
           </Button>
         </form>
-        <div className="rounded-[28px] border border-border/60 bg-background/70 p-5">
+        <div className="glass-control rounded-[28px] p-5">
           <Tabs defaultValue="rendered" className="grid gap-4">
             <TabsList className="w-full justify-start">
-              <TabsTrigger value="rendered">Preview</TabsTrigger>
-              <TabsTrigger value="text">Text</TabsTrigger>
+              <TabsTrigger value="rendered">{productContent.shared.previewTab}</TabsTrigger>
+              <TabsTrigger value="text">{productContent.shared.textTab}</TabsTrigger>
             </TabsList>
             <TabsContent value="rendered" className="mt-0">
               <div className="space-y-3">
                 <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                  Subject
+                  {formCopy.previewSubjectLabel}
                 </p>
-                <p className="text-lg font-semibold">{preview.subject || "No subject yet"}</p>
+                <p className="text-lg font-semibold">{preview.subject || productContent.shared.noSubjectLabel}</p>
                 <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                  Body
+                  {formCopy.previewBodyLabel}
                 </p>
                 {mode === "html" && preview.bodyHtml ? (
-                  <div className="overflow-hidden rounded-3xl border border-border/60 bg-white p-4 text-sm leading-6 text-slate-700">
+                  <div className="overflow-hidden rounded-[1.5rem] border border-white/65 bg-white p-4 text-sm leading-6 text-slate-700">
                     <SafeHtmlContent html={preview.bodyHtml} />
                   </div>
                 ) : (
-                  <div className="rounded-3xl border border-border/60 bg-background/80 p-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                    {preview.body || "No body yet"}
+                  <div className="rounded-[1.5rem] border border-white/60 bg-white/54 p-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                    {preview.body || productContent.shared.noBodyLabel}
                   </div>
                 )}
               </div>
             </TabsContent>
             <TabsContent value="text" className="mt-0">
-              <div className="rounded-3xl border border-border/60 bg-background/80 p-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                {preview.textFallback || "No text preview yet"}
+              <div className="rounded-[1.5rem] border border-white/60 bg-white/54 p-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                {preview.textFallback || productContent.shared.noTextPreviewLabel}
               </div>
             </TabsContent>
           </Tabs>

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { productContent } from "@/content/product";
 import { Button } from "@/components/ui/button";
 
 type ImportPanelProps = {
@@ -45,7 +46,7 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
   }
 
   function showApiError(message?: string) {
-    toast.error(message ?? "Import failed.");
+    toast.error(message ?? productContent.imports.panel.genericError);
   }
 
   function handleFileSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -56,7 +57,7 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
       const file = formData.get("file");
 
       if (!(file instanceof File) || !file.name) {
-        showApiError("Please choose a CSV or XLSX file.");
+        showApiError(productContent.imports.panel.fileMissingError);
         return;
       }
 
@@ -75,7 +76,7 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
         return;
       }
 
-      toast.success(`File import completed. ${payload?.count ?? 0} contact(s) processed.`);
+      toast.success(productContent.imports.panel.fileSuccess(payload?.count ?? 0));
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -105,7 +106,7 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
         return;
       }
 
-      toast.success(`Google Sheet import completed. ${payload?.count ?? 0} contact(s) processed.`);
+      toast.success(productContent.imports.panel.sheetSuccess(payload?.count ?? 0));
       refreshImports(payload?.status ?? "sheets-imported", payload?.count);
     });
   }
@@ -118,10 +119,10 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
           type="file"
           name="file"
           accept=".csv,.xlsx,.xls"
-          className="rounded-3xl border border-border bg-white/75 p-4 text-sm"
+          className="glass-control rounded-[1.5rem] p-4 text-sm"
         />
         <Button type="submit" disabled={isFilePending} className="h-11 rounded-full">
-          {isFilePending ? "Uploading..." : "Upload file"}
+          {isFilePending ? productContent.imports.panel.uploadingLabel : productContent.imports.panel.uploadLabel}
         </Button>
       </form>
 
@@ -131,11 +132,11 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
           name="url"
           value={sheetUrl}
           onChange={(event) => setSheetUrl(event.target.value)}
-          placeholder="https://docs.google.com/spreadsheets/..."
-          className="h-11 rounded-2xl border border-border bg-white/75 px-4 text-sm"
+          placeholder={productContent.imports.panel.sheetPlaceholder}
+          className="glass-control h-11 rounded-[1.2rem] px-4 text-sm"
         />
         <Button type="submit" variant="outline" disabled={isSheetPending} className="h-11 rounded-full">
-          {isSheetPending ? "Importing..." : "Import public Sheet"}
+          {isSheetPending ? productContent.imports.panel.sheetImportingLabel : productContent.imports.panel.sheetImportLabel}
         </Button>
       </form>
     </div>

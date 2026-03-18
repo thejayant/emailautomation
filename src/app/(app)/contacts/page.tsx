@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header";
+import { productContent } from "@/content/product";
 import { ContactsManager } from "@/components/contacts/contacts-manager";
 import { ManualContactForm } from "@/components/forms/manual-contact-form";
 import { getWorkspaceContext } from "@/lib/db/workspace";
@@ -14,9 +15,9 @@ export default async function ContactsPage() {
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Contacts"
-        title="Unified leads table"
-        description="Workspace-scoped contacts from manual entry, CSV/XLSX, Sheets, and future CRM adapters."
+        eyebrow={productContent.contacts.header.eyebrow}
+        title={productContent.contacts.header.title}
+        description={productContent.contacts.header.description}
       />
       <ManualContactForm refreshOnSuccess />
       <ContactsManager initialContacts={contacts} initialTags={tags} />

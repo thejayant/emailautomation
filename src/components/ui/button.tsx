@@ -4,20 +4,25 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-[1.15rem] border text-sm font-semibold tracking-[-0.01em] transition-[transform,box-shadow,background-color,border-color,color,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-55 active:translate-y-[1px] active:scale-[0.99] motion-reduce:transform-none motion-reduce:transition-none",
   {
     variants: {
       variant: {
-        default: "bg-primary px-4 py-2.5 text-primary-foreground hover:bg-primary/90",
-        secondary: "bg-secondary px-4 py-2.5 text-secondary-foreground hover:bg-secondary/90",
-        outline: "border border-border bg-card px-4 py-2.5 hover:bg-muted/50",
-        ghost: "px-4 py-2.5 hover:bg-muted/40",
-        danger: "bg-danger px-4 py-2.5 text-danger-foreground hover:bg-danger/90",
+        default:
+          "button-brand px-4 py-2.5 text-primary-foreground hover:-translate-y-0.5",
+        secondary:
+          "glass-control px-4 py-2.5 text-foreground hover:-translate-y-0.5 hover:border-white/90 hover:bg-white/82 hover:shadow-[0_18px_34px_rgba(17,39,63,0.12)]",
+        outline:
+          "glass-control px-4 py-2.5 text-foreground hover:-translate-y-0.5 hover:border-white/90 hover:bg-white/78 hover:shadow-[0_18px_34px_rgba(17,39,63,0.12)]",
+        ghost:
+          "border-transparent bg-transparent px-4 py-2.5 text-foreground shadow-none hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/46 hover:shadow-[0_12px_24px_rgba(17,39,63,0.08)]",
+        danger:
+          "border-[#aa4a40] bg-[linear-gradient(180deg,rgba(196,92,81,0.98),rgba(174,73,63,0.98))] px-4 py-2.5 text-danger-foreground shadow-[0_18px_34px_rgba(174,73,63,0.2)] hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(174,73,63,0.26)]",
       },
       size: {
-        default: "h-10",
-        sm: "h-8 px-3 text-xs",
-        lg: "h-12 px-6 text-base",
+        default: "h-11 px-5",
+        sm: "h-9 rounded-[0.95rem] px-3.5 text-xs",
+        lg: "h-12 rounded-[1.2rem] px-6 text-base",
       },
     },
     defaultVariants: {

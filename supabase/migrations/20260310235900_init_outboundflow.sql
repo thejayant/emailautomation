@@ -704,3 +704,5 @@ create policy "workspace members can read import files"
     bucket_id = 'imports'
     and auth.role() = 'authenticated'
   );
+
+notify pgrst, 'reload schema';

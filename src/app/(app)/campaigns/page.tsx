@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/page-header";
 import { SimpleDataTable } from "@/components/data-table/simple-data-table";
+import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import { listCampaigns } from "@/services/campaign-service";
 
@@ -21,17 +22,17 @@ export default async function CampaignsPage() {
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Campaigns"
-        title="Outbound programs"
-        description="Create, pause, resume, and inspect two-step outreach campaigns."
+        eyebrow={productContent.campaigns.header.eyebrow}
+        title={productContent.campaigns.header.title}
+        description={productContent.campaigns.header.description}
         actions={
           <Button asChild>
-            <Link href="/campaigns/new">New campaign</Link>
+            <Link href="/campaigns/new">{productContent.campaigns.header.ctaLabel}</Link>
           </Button>
         }
       />
       <SimpleDataTable
-        title="Campaigns"
+        title={productContent.campaigns.header.title}
         rows={campaigns}
         columns={[
           {
@@ -57,10 +58,10 @@ export default async function CampaignsPage() {
               <div className="flex items-center gap-2">
                 <SendNowButton campaignId={row.id} size="sm" disabled={row.status !== "active"} />
                 <Button asChild size="sm" variant="outline">
-                  <Link href={`/campaigns/${row.id}/edit`}>Edit</Link>
+                  <Link href={`/campaigns/${row.id}/edit`}>{productContent.campaigns.detail.editLabel}</Link>
                 </Button>
                 <Button asChild size="sm" variant="outline">
-                  <Link href={`/campaigns/${row.id}`}>Open</Link>
+                  <Link href={`/campaigns/${row.id}`}>{productContent.campaigns.detail.openLabel}</Link>
                 </Button>
                 <DeleteCampaignButton campaignId={row.id} size="sm" />
               </div>

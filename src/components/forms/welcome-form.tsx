@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import type { z } from "zod";
+import { productContent } from "@/content/product";
 import { profileSchema } from "@/lib/zod/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,7 @@ function getApiErrorMessage(error: unknown) {
     }
   }
 
-  return "Failed to save your profile";
+  return productContent.auth.welcome.errorMessage;
 }
 
 export function WelcomeForm({
@@ -63,7 +64,7 @@ export function WelcomeForm({
         return;
       }
 
-      toast.success("Profile saved");
+      toast.success(productContent.auth.welcome.successMessage);
       window.location.assign("/dashboard");
     });
   });
@@ -74,13 +75,13 @@ export function WelcomeForm({
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
       <div className="grid gap-2">
-        <Label htmlFor="welcome-full-name" className="text-sm font-medium text-[#355365]">
-          Full name
+        <Label htmlFor="welcome-full-name" className="text-sm font-medium text-foreground">
+          {productContent.auth.welcome.fullNameLabel}
         </Label>
         <Input
           id="welcome-full-name"
           className="auth-input"
-          placeholder="Jane Doe"
+          placeholder={productContent.auth.welcome.fullNamePlaceholder}
           autoComplete="name"
           {...form.register("fullName")}
         />
@@ -88,13 +89,13 @@ export function WelcomeForm({
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="welcome-title" className="text-sm font-medium text-[#355365]">
-          Title
+        <Label htmlFor="welcome-title" className="text-sm font-medium text-foreground">
+          {productContent.auth.welcome.titleLabel}
         </Label>
         <Input
           id="welcome-title"
           className="auth-input"
-          placeholder="Founder"
+          placeholder={productContent.auth.welcome.titlePlaceholder}
           autoComplete="organization-title"
           {...form.register("title")}
         />
@@ -105,9 +106,9 @@ export function WelcomeForm({
         type="submit"
         size="lg"
         disabled={isPending}
-        className="mt-2 h-12 rounded-2xl bg-[#163548] text-white shadow-[0_22px_48px_rgba(22,53,72,0.26)] hover:bg-[#1d4359]"
+        className="mt-2 h-12 rounded-[1.2rem]"
       >
-        {isPending ? "Saving..." : "Continue to dashboard"}
+        {isPending ? productContent.auth.welcome.pendingLabel : productContent.auth.welcome.submitLabel}
         {!isPending ? <ArrowRight className="size-4" /> : null}
       </Button>
     </form>

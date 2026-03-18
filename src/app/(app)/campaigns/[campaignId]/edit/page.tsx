@@ -1,5 +1,6 @@
 import { CampaignWizard } from "@/components/campaigns/campaign-wizard";
 import { PageHeader } from "@/components/layout/page-header";
+import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import { getCampaignForEditing, listTemplates } from "@/services/campaign-service";
 import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
@@ -33,9 +34,9 @@ export default async function EditCampaignPage({
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Campaign editor"
-        title={`Edit ${campaign.name}`}
-        description="Update the mailbox, audience, schedule, and future email content without losing send history."
+        eyebrow={productContent.campaigns.editCampaign.eyebrow}
+        title={productContent.campaigns.editCampaign.title(campaign.name)}
+        description={productContent.campaigns.editCampaign.description}
       />
       <CampaignWizard
         mode="edit"

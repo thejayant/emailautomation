@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { getSessionUser } from "@/lib/auth/session";
+import { buildWorkspaceShellLabel, getWorkspaceOwnerFirstName } from "@/lib/db/workspace-label";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { requireSupabaseConfiguration } from "@/lib/supabase/env";
 
@@ -7,6 +8,8 @@ export type WorkspaceContext = {
   userId: string;
   workspaceId: string;
   workspaceName: string;
+  workspaceLabel: string;
+  userFirstName: string | null;
 };
 
 function buildWorkspaceName(email?: string | null, fullName?: string | null) {
@@ -32,6 +35,23 @@ function buildWorkspaceSlug(userId: string, email?: string | null, fullName?: st
   return `${base || "workspace"}-${userId.slice(0, 8)}`;
 }
 
+function toWorkspaceBootstrapError(step: string, message: string) {
+  const normalizedMessage = message.trim();
+
+  if (
+    /Could not find the table ['"]public\./i.test(normalizedMessage) ||
+    /relation ["']public\..+["'] does not exist/i.test(normalizedMessage)
+  ) {
+    return new Error(
+      `Failed to bootstrap workspace during ${step}: ${normalizedMessage}. ` +
+        "The configured Supabase project is missing the required OutboundFlow tables. " +
+        "Apply supabase/migrations/20260310235900_init_outboundflow.sql and all later migrations to the same project, then reload the app.",
+    );
+  }
+
+  return new Error(`Failed to bootstrap workspace during ${step}: ${normalizedMessage}`);
+}
+
 async function ensureWorkspaceMembership(user: {
   id: string;
   email?: string | null;
@@ -39,12 +59,16 @@ async function ensureWorkspaceMembership(user: {
 }) {
   const supabase = createAdminSupabaseClient();
 
-  const { data: rawMembership } = await supabase
+  const { data: rawMembership, error: membershipLookupError } = await supabase
     .from("workspace_members")
     .select("workspace_id, workspaces(name)")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
+
+  if (membershipLookupError) {
+    throw toWorkspaceBootstrapError("membership lookup", membershipLookupError.message);
+  }
 
   const membership = rawMembership as
     | { workspace_id: string; workspaces?: { name?: string } | null }
@@ -59,11 +83,15 @@ async function ensureWorkspaceMembership(user: {
     };
   }
 
-  const { data: rawProfile } = await supabase
+  const { data: rawProfile, error: profileLookupError } = await supabase
     .from("profiles")
     .select("primary_workspace_id, full_name")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (profileLookupError) {
+    throw toWorkspaceBootstrapError("profile lookup", profileLookupError.message);
+  }
 
   const profile = rawProfile as
     | { primary_workspace_id?: string | null; full_name?: string | null }
@@ -73,11 +101,15 @@ async function ensureWorkspaceMembership(user: {
   let workspaceName = buildWorkspaceName(user.email, profile?.full_name ?? user.user_metadata?.full_name);
 
   if (workspaceId) {
-    const { data: rawWorkspace } = await supabase
+    const { data: rawWorkspace, error: workspaceLookupError } = await supabase
       .from("workspaces")
       .select("id, name")
       .eq("id", workspaceId)
       .maybeSingle();
+
+    if (workspaceLookupError) {
+      throw toWorkspaceBootstrapError("workspace lookup", workspaceLookupError.message);
+    }
 
     const workspace = rawWorkspace as { id: string; name?: string | null } | null;
     if (workspace) {
@@ -103,7 +135,7 @@ async function ensureWorkspaceMembership(user: {
       .single();
 
     if (workspaceError) {
-      throw new Error(`Failed to bootstrap workspace: ${workspaceError.message}`);
+      throw toWorkspaceBootstrapError("workspace creation", workspaceError.message);
     }
 
     const workspace = insertedWorkspace as { id: string; name?: string | null };
@@ -190,9 +222,30 @@ export const getWorkspaceContext = cache(async (): Promise<WorkspaceContext> => 
     user_metadata: user.user_metadata as { full_name?: string | null } | null,
   });
 
+  const supabase = createAdminSupabaseClient();
+  const { data: rawProfile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const profile = rawProfile as { full_name?: string | null } | null;
+  const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? null;
+  const userFirstName = getWorkspaceOwnerFirstName({
+    fullName,
+    workspaceName: workspace.workspaceName,
+    email: user.email,
+  });
+
   return {
     userId: user.id,
     workspaceId: workspace.workspaceId,
     workspaceName: workspace.workspaceName,
+    workspaceLabel: buildWorkspaceShellLabel({
+      fullName,
+      workspaceName: workspace.workspaceName,
+      email: user.email,
+    }),
+    userFirstName,
   };
 });

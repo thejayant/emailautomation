@@ -2,6 +2,7 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { ReplyRateChart } from "@/components/dashboard/reply-rate-chart";
 import { LiveRefresh } from "@/components/layout/live-refresh";
 import { PageHeader } from "@/components/layout/page-header";
+import { productContent } from "@/content/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import { getDashboardMetrics, getReplyRateByCampaign } from "@/services/analytics-service";
@@ -33,30 +34,31 @@ export default async function DashboardPage() {
     <div className="grid gap-8">
       <PageHeader
         eyebrow={workspace.workspaceName}
-        title="Dashboard"
-        description="Live workspace metrics, campaign health, and onboarding guidance for the cold email system."
-        actions={<LiveRefresh label="Live sync every 15s" />}
+        title={productContent.dashboard.title}
+        description={productContent.dashboard.description}
+        actions={<LiveRefresh label={productContent.dashboard.liveRefreshLabel} />}
       />
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Total leads" value={metrics.totalLeads} />
-        <KpiCard label="Queued" value={metrics.queued} />
-        <KpiCard label="Sent" value={metrics.sent} />
-        <KpiCard label="Follow-up sent" value={metrics.followupSent} />
-        <KpiCard label="Replied" value={metrics.replied} />
-        <KpiCard label="Unsubscribed" value={metrics.unsubscribed} />
-        <KpiCard label="Failed" value={metrics.failed} />
-        <KpiCard label="Reply rate" value={metrics.replyRate} kind="percent" />
+        <KpiCard label={productContent.dashboard.kpis.totalLeads} value={metrics.totalLeads} />
+        <KpiCard label={productContent.dashboard.kpis.queued} value={metrics.queued} />
+        <KpiCard label={productContent.dashboard.kpis.sent} value={metrics.sent} />
+        <KpiCard label={productContent.dashboard.kpis.followupSent} value={metrics.followupSent} />
+        <KpiCard label={productContent.dashboard.kpis.replied} value={metrics.replied} />
+        <KpiCard label={productContent.dashboard.kpis.unsubscribed} value={metrics.unsubscribed} />
+        <KpiCard label={productContent.dashboard.kpis.failed} value={metrics.failed} />
+        <KpiCard label={productContent.dashboard.kpis.replyRate} value={metrics.replyRate} kind="percent" />
       </section>
-      <ReplyRateChart data={chartData} />
-      <Card className="border-border/60 bg-card/90">
+      <ReplyRateChart data={chartData} title={productContent.dashboard.chartTitle} />
+      <Card>
         <CardHeader>
-          <CardTitle>Onboarding checklist</CardTitle>
+          <CardTitle>{productContent.dashboard.checklistTitle}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm text-muted-foreground">
-          <div>1. Connect a Gmail mailbox from Profile.</div>
-          <div>2. Upload a CSV/XLSX file or import a public Google Sheet.</div>
-          <div>3. Save a reusable template with merge variables.</div>
-          <div>4. Launch a campaign and keep this page open to auto-sync sends and replies.</div>
+          {productContent.dashboard.checklist.map((item, index) => (
+            <div key={item}>
+              {index + 1}. {item}
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>

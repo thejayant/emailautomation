@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
+import { productContent } from "@/content/product";
 import { profileSchema } from "@/lib/zod/schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,31 +35,31 @@ export function ProfileForm({
 
       if (!response.ok) {
         const error = await response.json().catch(() => null);
-        toast.error(error?.error ?? "Failed to save profile");
+        toast.error(error?.error ?? productContent.profile.form.errorMessage);
         return;
       }
 
-      toast.success("Profile updated");
+      toast.success(productContent.profile.form.successMessage);
     });
   });
 
   return (
-    <Card className="border-border/60 bg-card/90">
+    <Card>
       <CardHeader>
-        <CardTitle>Personal profile</CardTitle>
+        <CardTitle>{productContent.profile.form.title}</CardTitle>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4 md:max-w-xl" onSubmit={onSubmit}>
           <div className="grid gap-2">
-            <Label htmlFor="fullName">Full name</Label>
+            <Label htmlFor="fullName">{productContent.profile.form.fullNameLabel}</Label>
             <Input id="fullName" {...form.register("fullName")} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" placeholder="Growth lead" {...form.register("title")} />
+            <Label htmlFor="title">{productContent.profile.form.titleLabel}</Label>
+            <Input id="title" placeholder={productContent.profile.form.titlePlaceholder} {...form.register("title")} />
           </div>
           <Button type="submit" disabled={isPending}>
-            {isPending ? "Saving..." : "Save profile"}
+            {isPending ? productContent.profile.form.pendingLabel : productContent.profile.form.submitLabel}
           </Button>
         </form>
       </CardContent>

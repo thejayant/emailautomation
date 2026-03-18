@@ -13,15 +13,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function ReplyRateChart({
   data,
+  title = "Reply rate by campaign",
 }: {
   data: Array<{ name: string; replyRate: number }>;
+  title?: string;
 }) {
   return (
-    <Card className="card-shadow border-border/60 bg-card/90">
+    <Card className="card-shadow">
       <CardHeader>
-        <CardTitle>Reply rate by campaign</CardTitle>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="h-[320px]">
+      <CardContent className="h-[320px] min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(91,100,114,0.2)" />

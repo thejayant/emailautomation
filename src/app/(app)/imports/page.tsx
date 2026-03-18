@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header";
+import { productContent } from "@/content/product";
 import { ImportPanel } from "@/components/imports/import-panel";
 import { ImportMapper } from "@/components/imports/import-mapper";
 import { Badge } from "@/components/ui/badge";
@@ -25,14 +26,14 @@ function getImportBanner(status?: string, error?: string, count?: string) {
   if (status === "uploaded") {
     return {
       tone: "success" as const,
-      text: `File import completed. ${count ?? "0"} contact(s) were processed.`,
+      text: productContent.imports.banners.fileUploaded(count),
     };
   }
 
   if (status === "sheets-imported") {
     return {
       tone: "success" as const,
-      text: `Google Sheet import completed. ${count ?? "0"} contact(s) were processed.`,
+      text: productContent.imports.banners.sheetImported(count),
     };
   }
 
@@ -54,9 +55,9 @@ export default async function ImportsPage({ searchParams }: ImportsPageProps) {
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Imports"
-        title="Lead ingestion"
-        description="Upload CSV/XLSX files, import public Google Sheets, and preserve raw rows for debugging."
+        eyebrow={productContent.imports.header.eyebrow}
+        title={productContent.imports.header.title}
+        description={productContent.imports.header.description}
       />
       {banner ? (
         <div
@@ -70,31 +71,31 @@ export default async function ImportsPage({ searchParams }: ImportsPageProps) {
         </div>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <Card className="border-border/60 bg-card/90">
+        <Card>
           <CardHeader>
-            <CardTitle>Upload lead file</CardTitle>
+            <CardTitle>{productContent.imports.uploadCardTitle}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6">
             <ImportPanel />
-            <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-              Use a public Google Sheet link. Private sheets and non-exportable links will be rejected.
+            <div className="glass-control rounded-[1.35rem] px-4 py-3 text-sm text-muted-foreground">
+              {productContent.imports.uploadHelper}
             </div>
           </CardContent>
         </Card>
         <ImportMapper headers={["Email", "First Name", "Company", "Website", "Job Title"]} />
       </div>
-      <Card className="border-border/60 bg-card/90">
+      <Card>
         <CardHeader>
-          <CardTitle>Import history</CardTitle>
+          <CardTitle>{productContent.imports.history.title}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">
           {imports.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between rounded-3xl border border-border/60 bg-background/65 px-4 py-3 text-sm"
+              className="glass-control flex items-center justify-between rounded-[1.5rem] px-4 py-3 text-sm"
             >
               <div>
-                <p className="font-medium">{item.file_name ?? "Untitled import"}</p>
+                <p className="font-medium">{item.file_name ?? productContent.imports.history.untitledLabel}</p>
                 <p className="text-muted-foreground">{item.source_type}</p>
               </div>
               <div className="flex items-center gap-3">

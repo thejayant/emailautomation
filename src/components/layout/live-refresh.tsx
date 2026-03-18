@@ -2,6 +2,7 @@
 
 import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { productContent } from "@/content/product";
 import { Button } from "@/components/ui/button";
 
 export function LiveRefresh({
@@ -28,7 +29,9 @@ export function LiveRefresh({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
+      <span className="glass-chip rounded-full px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+        {label}
+      </span>
       <Button
         type="button"
         size="sm"
@@ -40,7 +43,7 @@ export function LiveRefresh({
           });
         }}
       >
-        {isPending ? "Syncing..." : "Sync now"}
+        {isPending ? productContent.shared.liveRefresh.syncing : productContent.shared.liveRefresh.syncNow}
       </Button>
     </div>
   );

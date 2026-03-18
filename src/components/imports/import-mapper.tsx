@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { productContent } from "@/content/product";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,13 +30,13 @@ export function ImportMapper({ headers }: { headers: string[] }) {
   );
 
   return (
-    <Card className="border-border/60 bg-card/90">
+    <Card>
       <CardHeader className="gap-4">
-        <CardTitle>Column mapping preview</CardTitle>
+        <CardTitle>{productContent.imports.mapper.title}</CardTitle>
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Filter source columns"
+          placeholder={productContent.imports.mapper.filterPlaceholder}
         />
       </CardHeader>
       <CardContent className="grid gap-3">

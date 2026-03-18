@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { productContent } from "@/content/product";
 import {
   Table,
   TableBody,
@@ -38,13 +39,15 @@ export function SimpleDataTable({
   emptyLabel?: string;
 }) {
   return (
-    <Card className="card-shadow border-border/60 bg-card/90">
+    <Card className="card-shadow">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{title}</CardTitle>
-        <Badge variant="neutral">{rows.length} rows</Badge>
+        <Badge variant="neutral">
+          {rows.length} {productContent.shared.rowsLabel}
+        </Badge>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-[24px] border border-white/60 bg-white/46">
           <Table>
             <TableHeader>
               <TableRow>
@@ -69,7 +72,7 @@ export function SimpleDataTable({
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="py-10 text-center text-muted-foreground">
-                    {emptyLabel ?? "No records yet."}
+                    {emptyLabel ?? productContent.shared.emptyRecordsLabel}
                   </TableCell>
                 </TableRow>
               )}

@@ -12,13 +12,13 @@ export function KpiCard({
   kind?: "count" | "percent";
 }) {
   return (
-    <Card className="card-shadow border-border/60 bg-card/90">
+    <Card className="card-shadow">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
         <ArrowUpRight className="size-4 text-primary" />
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-semibold tracking-[-0.04em]">
+        <div className="text-3xl font-semibold tracking-[-0.05em] text-foreground">
           {kind === "percent" ? formatPercent(value) : formatNumber(value)}
         </div>
       </CardContent>

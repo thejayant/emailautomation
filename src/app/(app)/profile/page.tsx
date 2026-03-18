@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Mail } from "lucide-react";
+import { GmailMark } from "@/components/icons/gmail-mark";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
@@ -19,28 +20,28 @@ function getGmailBanner(gmail?: string, message?: string) {
   if (gmail === "connected") {
     return {
       tone: "success",
-      text: "Gmail mailbox connected successfully.",
+      text: productContent.profile.banners.connected,
     };
   }
 
   if (gmail === "disconnected") {
     return {
       tone: "default",
-      text: "Gmail mailbox disconnected.",
+      text: productContent.profile.banners.disconnected,
     };
   }
 
   if (gmail === "missing-code") {
     return {
       tone: "error",
-      text: "Google did not return a valid OAuth code.",
+      text: productContent.profile.banners.missingCode,
     };
   }
 
   if (gmail === "error") {
     return {
       tone: "error",
-      text: message ? decodeURIComponent(message) : "Gmail connection failed.",
+      text: message ? decodeURIComponent(message) : productContent.profile.banners.genericError,
     };
   }
 
@@ -67,9 +68,9 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Profile"
-        title="Personal settings"
-        description="Manage your profile, mailbox connection, and personal sending defaults."
+        eyebrow={productContent.profile.header.eyebrow}
+        title={productContent.profile.header.title}
+        description={productContent.profile.header.description}
       />
       {gmailBanner ? (
         <div
@@ -90,32 +91,45 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           title: profile?.title ?? "",
         }}
       />
-      <Card className="border-border/60 bg-card/90">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Connected Gmail accounts</CardTitle>
-          <Button asChild>
+      <Card>
+        <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle>{productContent.profile.gmailCard.title}</CardTitle>
+          <Button asChild variant="outline" className="gmail-connect-button w-full sm:w-auto sm:min-w-[13rem]">
             <Link href="/api/gmail/connect">
-              <Mail className="size-4" />
-              Connect Gmail
+              <span className="gmail-connect-button-icon">
+                <GmailMark className="size-5" />
+              </span>
+              {productContent.profile.gmailCard.connectLabel}
             </Link>
           </Button>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {gmailAccounts.map((account) => (
-            <div
-              key={account.id}
-              className="flex items-center justify-between rounded-3xl border border-border/60 bg-background/65 px-4 py-3 text-sm"
-            >
-              <div>
-                <p className="font-medium">{account.email_address}</p>
-                <p className="text-muted-foreground">{account.status}</p>
+          {gmailAccounts.length ? (
+            gmailAccounts.map((account) => (
+              <div
+                key={account.id}
+                className="glass-control flex items-center justify-between rounded-[1.5rem] px-4 py-3 text-sm"
+              >
+                <div>
+                  <p className="font-medium">{account.email_address}</p>
+                  <p className="text-muted-foreground">{account.status}</p>
+                </div>
+                <form action="/api/gmail/disconnect" method="post">
+                  <input type="hidden" name="gmailAccountId" value={account.id} />
+                  <button className="font-medium text-danger">
+                    {productContent.profile.gmailCard.disconnectLabel}
+                  </button>
+                </form>
               </div>
-              <form action="/api/gmail/disconnect" method="post">
-                <input type="hidden" name="gmailAccountId" value={account.id} />
-                <button className="font-medium text-danger">Disconnect</button>
-              </form>
+            ))
+          ) : (
+            <div className="glass-control rounded-[1.5rem] px-4 py-5">
+              <p className="font-medium text-foreground">{productContent.profile.gmailCard.emptyTitle}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {productContent.profile.gmailCard.emptyDescription}
+              </p>
             </div>
-          ))}
+          )}
         </CardContent>
       </Card>
     </div>

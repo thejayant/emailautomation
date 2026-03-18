@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { productContent } from "@/content/product";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthForm } from "@/components/forms/auth-form";
 import { getServerPostAuthRedirectPath } from "@/lib/auth/redirects";
@@ -14,13 +15,14 @@ export default async function SignInPage() {
 
   return (
     <AuthShell
-      caption="Use your account to access your workspace."
+      badge={productContent.auth.signIn.badge}
+      caption={productContent.auth.signIn.caption}
     >
       <AuthForm mode="sign-in" />
-      <p className="text-center text-sm text-[#688295]">
-        New here?{" "}
-        <Link href="/sign-up" className="font-semibold text-[#163548] transition hover:text-[#2b6f95]">
-          Create an account
+      <p className="text-center text-sm text-muted-foreground">
+        {productContent.auth.signIn.switchPrompt}{" "}
+        <Link href="/sign-up" className="font-semibold text-foreground transition hover:text-primary">
+          {productContent.auth.signIn.switchLabel}
         </Link>
       </p>
     </AuthShell>

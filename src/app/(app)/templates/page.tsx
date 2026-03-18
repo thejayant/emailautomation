@@ -1,6 +1,7 @@
 import { TemplateForm } from "@/components/forms/template-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { SimpleDataTable } from "@/components/data-table/simple-data-table";
+import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import { listTemplates } from "@/services/campaign-service";
 
@@ -17,20 +18,24 @@ export default async function TemplatesPage() {
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Templates"
-        title="Reusable copy blocks"
-        description="Save reusable text or HTML email templates with merge variables like {{first_name}}, {{company}}, and custom fields."
+        eyebrow={productContent.templates.header.eyebrow}
+        title={productContent.templates.header.title}
+        description={productContent.templates.header.description}
       />
       <TemplateForm />
       <SimpleDataTable
-        title="Saved templates"
+        title={productContent.templates.table.title}
         rows={templates}
+        emptyLabel={productContent.templates.table.emptyLabel}
         columns={[
           { key: "name", header: "Name" },
           {
             key: "mode",
             header: "Mode",
-            render: (row) => ((row.body_html_template as string | null | undefined) ? "HTML" : "Text"),
+            render: (row) =>
+              (row.body_html_template as string | null | undefined)
+                ? productContent.templates.table.htmlModeLabel
+                : productContent.templates.table.textModeLabel,
           },
           { key: "subject_template", header: "Subject" },
           {
@@ -38,7 +43,7 @@ export default async function TemplatesPage() {
             header: "Preview",
             render: (row) =>
               ((row.body_html_template as string | null | undefined)
-                ? "Designed HTML template with text fallback"
+                ? productContent.templates.table.htmlPreviewLabel
                 : String(row.body_template ?? "").slice(0, 120)),
           },
         ]}

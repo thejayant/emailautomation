@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { productContent } from "@/content/product";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthForm } from "@/components/forms/auth-form";
 
@@ -11,16 +12,21 @@ type ForgotPasswordPageProps = {
 export default async function ForgotPasswordPage({ searchParams }: ForgotPasswordPageProps) {
   const params = (await searchParams) ?? {};
   const mode = params.mode === "update" ? "update-password" : "forgot-password";
+  const copy =
+    mode === "update-password"
+      ? productContent.auth.updatePassword
+      : productContent.auth.forgotPassword;
 
   return (
     <AuthShell
-      caption={mode === "update-password" ? "Set a new password to continue." : "Reset access to your account."}
+      badge={copy.badge}
+      caption={copy.caption}
     >
       <AuthForm mode={mode} />
-      <p className="text-center text-sm text-[#688295]">
-        Remembered it?{" "}
-        <Link href="/sign-in" className="font-semibold text-[#163548] transition hover:text-[#2b6f95]">
-          Return to sign in
+      <p className="text-center text-sm text-muted-foreground">
+        {copy.switchPrompt}{" "}
+        <Link href="/sign-in" className="font-semibold text-foreground transition hover:text-primary">
+          {copy.switchLabel}
         </Link>
       </p>
     </AuthShell>

@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { getWorkspaceContext } from "@/lib/db/workspace";
 import { requireSessionUser } from "@/lib/auth/session";
 import { requireSupabaseConfiguration } from "@/lib/supabase/env";
 
@@ -11,6 +12,7 @@ export default async function ProtectedAppLayout({
 }) {
   requireSupabaseConfiguration();
   await requireSessionUser();
+  const workspace = await getWorkspaceContext();
 
-  return <AppShell>{children}</AppShell>;
+  return <AppShell brandSubtitle={workspace.workspaceLabel}>{children}</AppShell>;
 }

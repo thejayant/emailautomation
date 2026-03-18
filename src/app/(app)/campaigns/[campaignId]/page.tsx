@@ -5,6 +5,7 @@ import { SimpleDataTable } from "@/components/data-table/simple-data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { productContent } from "@/content/product";
 import { getCampaignById } from "@/services/campaign-service";
 import Link from "next/link";
 
@@ -48,13 +49,13 @@ export default async function CampaignDetailPage({
   return (
     <div className="grid gap-8">
       <PageHeader
-        eyebrow="Campaign detail"
+        eyebrow={productContent.campaigns.detail.eyebrow}
         title={campaign.name}
-        description="Inspect contact-level queue state, follow-up timing, failures, and pause/resume actions."
+        description={productContent.campaigns.detail.description}
         actions={
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="outline">
-              <Link href={`/campaigns/${campaignId}/edit`}>Edit campaign</Link>
+              <Link href={`/campaigns/${campaignId}/edit`}>{productContent.campaigns.detail.editLabel}</Link>
             </Button>
             <DeleteCampaignButton campaignId={campaignId} />
             <SendNowButton campaignId={campaignId} />
@@ -66,27 +67,29 @@ export default async function CampaignDetailPage({
                 value={campaign.status === "active" ? "paused" : "active"}
               />
               <Button type="submit" variant="outline">
-                {campaign.status === "active" ? "Pause campaign" : "Resume campaign"}
+                {campaign.status === "active"
+                  ? productContent.campaigns.detail.pauseLabel
+                  : productContent.campaigns.detail.resumeLabel}
               </Button>
             </form>
           </div>
         }
       />
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-border/60 bg-card/90">
-          <CardHeader><CardTitle>Status</CardTitle></CardHeader>
+        <Card>
+          <CardHeader><CardTitle>{productContent.campaigns.detail.statusLabel}</CardTitle></CardHeader>
           <CardContent><Badge variant={campaign.status === "active" ? "success" : "neutral"}>{campaign.status}</Badge></CardContent>
         </Card>
-        <Card className="border-border/60 bg-card/90">
-          <CardHeader><CardTitle>Daily cap</CardTitle></CardHeader>
+        <Card>
+          <CardHeader><CardTitle>{productContent.campaigns.detail.dailyCapLabel}</CardTitle></CardHeader>
           <CardContent>{campaign.daily_send_limit}</CardContent>
         </Card>
-        <Card className="border-border/60 bg-card/90">
-          <CardHeader><CardTitle>Timezone</CardTitle></CardHeader>
+        <Card>
+          <CardHeader><CardTitle>{productContent.campaigns.detail.timezoneLabel}</CardTitle></CardHeader>
           <CardContent>{campaign.timezone}</CardContent>
         </Card>
-        <Card className="border-border/60 bg-card/90">
-          <CardHeader><CardTitle>Window</CardTitle></CardHeader>
+        <Card>
+          <CardHeader><CardTitle>{productContent.campaigns.detail.windowLabel}</CardTitle></CardHeader>
           <CardContent>{campaign.send_window_start ?? "09:00"} - {campaign.send_window_end ?? "17:00"}</CardContent>
         </Card>
       </div>
@@ -95,10 +98,15 @@ export default async function CampaignDetailPage({
           .slice()
           .sort((a, b) => a.step_number - b.step_number)
           .map((step) => (
-            <Card key={step.step_number} className="border-border/60 bg-card/90">
+            <Card key={step.step_number}>
               <CardHeader>
                 <CardTitle>
-                  Step {step.step_number}: {step.step_type === "follow_up" ? "Follow-up" : "Primary email"}
+                  {productContent.campaigns.detail.stepTitle(
+                    step.step_number,
+                    step.step_type === "follow_up"
+                      ? productContent.campaigns.detail.followupStepLabel
+                      : productContent.campaigns.detail.primaryStepLabel,
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
@@ -106,13 +114,13 @@ export default async function CampaignDetailPage({
                   <Badge variant="neutral">{step.body_html_template ? "HTML" : "Text"}</Badge>
                 </div>
                 <div className="grid gap-1">
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Subject</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{productContent.campaigns.detail.subjectLabel}</p>
                   <p className="font-medium">{step.subject_template}</p>
                 </div>
                 <div className="grid gap-1">
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Body preview</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{productContent.campaigns.detail.bodyPreviewLabel}</p>
                   <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                    {step.body_html_template ? "Stored as HTML with text fallback" : step.body_template}
+                    {step.body_html_template ? productContent.campaigns.detail.htmlBodyPreviewLabel : step.body_template}
                   </p>
                 </div>
               </CardContent>
@@ -120,7 +128,7 @@ export default async function CampaignDetailPage({
           ))}
       </div>
       <SimpleDataTable
-        title="Campaign contacts"
+        title={productContent.campaigns.detail.contactsTitle}
         rows={campaignContacts.map((item) => ({
           id: item.id,
           status: item.status,
