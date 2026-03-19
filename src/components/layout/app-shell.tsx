@@ -41,7 +41,7 @@ export function AppShell({
         </div>
 
         <aside className="hidden xl:block">
-          <div className="sidebar-shell glass-nav scrollbar-none sticky top-4 flex h-[calc(100vh-2rem)] min-h-0 flex-col overflow-y-auto rounded-[34px] p-6 text-sidebar-foreground shadow-[0_26px_68px_rgba(17,39,63,0.14)]">
+          <div className="sidebar-shell glass-nav sticky top-4 flex h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-[34px] p-6 text-sidebar-foreground shadow-[0_26px_68px_rgba(17,39,63,0.14)]">
             <div className="sidebar-brand-row mb-8 flex items-start justify-between gap-4">
               <Link href="/dashboard" className="min-w-0 space-y-2">
                 <p className="sidebar-brand-kicker font-mono text-[11px] uppercase tracking-[0.34em] text-sidebar-muted">
@@ -56,17 +56,16 @@ export function AppShell({
               </span>
             </div>
 
-            <SidebarNav />
+            <div className="sidebar-nav-region scrollbar-none min-h-0 flex-1 overflow-y-auto pr-1">
+              <SidebarNav />
+            </div>
 
-            <div className="sidebar-helper glass-control mt-auto min-h-fit shrink-0 overflow-hidden rounded-[30px] p-5 xl:p-6">
+            <div className="sidebar-helper glass-control mt-6 min-h-fit shrink-0 overflow-hidden rounded-[30px] p-5 xl:p-6">
               <p className="sidebar-helper-title text-sm font-semibold tracking-[-0.02em] text-sidebar-foreground">
                 {productContent.shell.helper.title}
               </p>
-              <p className="sidebar-helper-copy mt-2 text-sm leading-6 text-sidebar-muted">
-                {productContent.shell.helper.description}
-              </p>
               <div className="sidebar-helper-actions">
-                <Link href="/profile" className="sidebar-helper-link group mt-4 w-full">
+                <Link href="/profile" className="sidebar-helper-link group w-full">
                   <span className="sidebar-helper-link-icon">
                     <GmailMark className="size-5" />
                   </span>
@@ -82,7 +81,7 @@ export function AppShell({
                     <ArrowUpRight className="size-4 shrink-0" />
                   </span>
                 </Link>
-                <form action="/api/auth/sign-out" method="post" className="sidebar-helper-form mt-5">
+                <form action="/api/auth/sign-out" method="post" className="sidebar-helper-form">
                   <Button type="submit" variant="outline" className="sidebar-helper-button w-full justify-center">
                     <LogOut className="size-4" />
                     {productContent.shell.signOutLabel}

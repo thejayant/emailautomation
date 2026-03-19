@@ -386,6 +386,16 @@ body::-webkit-scrollbar-corner,
   background: rgba(255, 255, 255, 0.96);
 }
 
+.sidebar-helper-actions {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.95rem;
+}
+
+.sidebar-helper-form {
+  margin-top: 0;
+}
+
 .sidebar-brand-title {
   font-size: 32px;
   line-height: 1.05;

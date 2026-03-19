@@ -472,9 +472,7 @@ export const productContent: ProductContent = {
       { href: "/profile", label: "Profile" },
     ],
     helper: {
-      title: "Operator defaults",
-      description:
-        "Gmail-first sending, one follow-up after two days, and shared workspace safety caps.",
+      title: "Workspace quick actions",
     },
     signOutLabel: "Sign out",
   },
