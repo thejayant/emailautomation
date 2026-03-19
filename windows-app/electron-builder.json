@@ -1,0 +1,36 @@
+{
+  "appId": "com.outboundflow.desktop",
+  "asar": false,
+  "directories": {
+    "output": "windows-app/out"
+  },
+  "extraMetadata": {
+    "main": "windows-app/src/main.cjs"
+  },
+  "files": [
+    "windows-app/app-icon.ico",
+    "windows-app/src/**/*",
+    "windows-app/.app/**/*",
+    "package.json"
+  ],
+  "nsis": {
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "oneClick": false,
+    "shortcutName": "OutboundFlow"
+  },
+  "productName": "OutboundFlow",
+  "win": {
+    "icon": "windows-app/app-icon.ico",
+    "signAndEditExecutable": false,
+    "target": [
+      {
+        "arch": [
+          "x64"
+        ],
+        "target": "nsis"
+      }
+    ]
+  }
+}

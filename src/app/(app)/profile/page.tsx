@@ -1,8 +1,6 @@
-import Link from "next/link";
-import { GmailMark } from "@/components/icons/gmail-mark";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
+import { GmailConnectButton } from "@/components/profile/gmail-connect-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
@@ -94,14 +92,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       <Card>
         <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>{productContent.profile.gmailCard.title}</CardTitle>
-          <Button asChild variant="outline" className="gmail-connect-button w-full sm:w-auto sm:min-w-[13rem]">
-            <Link href="/api/gmail/connect">
-              <span className="gmail-connect-button-icon">
-                <GmailMark className="size-5" />
-              </span>
-              {productContent.profile.gmailCard.connectLabel}
-            </Link>
-          </Button>
+          <GmailConnectButton label={productContent.profile.gmailCard.connectLabel} />
         </CardHeader>
         <CardContent className="grid gap-3">
           {gmailAccounts.length ? (

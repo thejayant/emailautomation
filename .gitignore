@@ -19,6 +19,8 @@
 
 # production
 /build
+/windows-app/.app
+/windows-app/out
 
 # misc
 .DS_Store

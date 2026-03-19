@@ -1,6 +1,7 @@
 import { SignJWT } from "jose";
 import { NextResponse } from "next/server";
 import { getWorkspaceContext } from "@/lib/db/workspace";
+import { parseDesktopCallbackUrl } from "@/lib/auth/desktop-oauth";
 import { createGoogleConnectUrl } from "@/services/gmail-service";
 import { env, requireGoogleConfiguration } from "@/lib/supabase/env";
 
@@ -12,11 +13,15 @@ function getStateSecret() {
   return new TextEncoder().encode(env.TOKEN_ENCRYPTION_KEY);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   requireGoogleConfiguration();
 
   const workspace = await getWorkspaceContext();
+  const desktopCallbackUrl = parseDesktopCallbackUrl(
+    new URL(request.url).searchParams.get("desktopCallbackUrl"),
+  );
   const state = await new SignJWT({
+    desktopCallbackUrl,
     workspaceId: workspace.workspaceId,
     userId: workspace.userId,
   })
