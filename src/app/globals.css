@@ -607,8 +607,9 @@ body::-webkit-scrollbar-corner,
 
 .marketing-proof-section {
   background:
-    radial-gradient(circle at top left, rgba(255, 44, 136, 0.14), transparent 16%),
-    linear-gradient(180deg, #22084f 0%, #170331 100%);
+    radial-gradient(circle at top left, rgba(255, 44, 136, 0.16), transparent 18%),
+    radial-gradient(circle at top right, rgba(146, 87, 255, 0.14), transparent 24%),
+    linear-gradient(180deg, #1b053f 0%, #241057 28%, #32206d 64%, #41307b 100%);
 }
 
 .marketing-light-section {
