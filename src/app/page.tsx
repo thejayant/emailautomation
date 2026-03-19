@@ -9,6 +9,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
+import { RotatingEyebrow } from "@/components/marketing/rotating-eyebrow";
 import { Button } from "@/components/ui/button";
 import { ScrollReveal } from "@/components/marketing/scroll-reveal";
 import { getSessionUser } from "@/lib/auth/session";
@@ -18,6 +19,13 @@ const navItems = [
   { label: "Proof", href: "#proof" },
   { label: "Workflow", href: "#workflow" },
   { label: "Why OutboundFlow", href: "#why" },
+];
+
+const rotatingEyebrowItems = [
+  "Email Campaign Platform",
+  "Cibirix SEO Team Product",
+  "Outbound Workspace",
+  "Cibirix Outreach Product",
 ];
 
 const productPillars = [
@@ -182,9 +190,10 @@ export default async function HomePage() {
                   <p className="text-xl font-semibold tracking-[-0.04em] text-white">
                     OutboundFlow
                   </p>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-white/58">
-                    email campaign platform
-                  </p>
+                  <RotatingEyebrow
+                    items={rotatingEyebrowItems}
+                    className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/58 sm:text-[11px] sm:tracking-[0.2em]"
+                  />
                 </HydrationSafeDiv>
               </Link>
 
@@ -246,9 +255,6 @@ export default async function HomePage() {
                     <ArrowRight className="size-4" />
                   </Link>
                 </Button>
-                <p className="font-mono text-xs uppercase tracking-[0.24em] text-white/58">
-                  Import leads. Launch campaigns. Track replies.
-                </p>
               </HydrationSafeDiv>
             </HydrationSafeDiv>
           </HydrationSafeDiv>
@@ -263,7 +269,7 @@ export default async function HomePage() {
               <h2 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white md:text-5xl">
                 Less tool switching. Faster campaign execution.
               </h2>
-              <p className="mt-5 text-lg leading-8 text-white/68">
+              <p className="mt-5 pb-4 text-lg leading-8 text-white/68">
                 OutboundFlow keeps lists, sends, replies, and follow-up context inside one
                 workspace so operators can focus on conversion instead of coordination.
               </p>
@@ -395,7 +401,7 @@ export default async function HomePage() {
         </HydrationSafeDiv>
       </section>
 
-      <section className="marketing-final-section px-6 pb-24 pt-8 md:px-10 lg:px-14">
+      <section className="marketing-final-section px-6 pb-12 pt-8 md:px-10 lg:px-14">
         <HydrationSafeDiv className="mx-auto max-w-7xl">
           <HydrationSafeDiv
             data-reveal="up"
@@ -440,8 +446,8 @@ export default async function HomePage() {
         </HydrationSafeDiv>
       </section>
 
-      <footer className="marketing-footer px-6 py-8 md:px-10 lg:px-14">
-        <HydrationSafeDiv className="mx-auto flex max-w-7xl items-center justify-between gap-4 border-t border-[#e7d6e3] pt-6 text-sm text-[#6f6882]">
+      <footer className="marketing-footer px-6 py-4 md:px-10 lg:px-14">
+        <HydrationSafeDiv className="mx-auto flex max-w-7xl items-center justify-between gap-4 border-t border-[#e7d6e3] pt-4 text-sm text-[#6f6882]">
           <p>OutboundFlow</p>
           <p>Built by the Cibirix SEO team</p>
         </HydrationSafeDiv>
