@@ -1,6 +1,6 @@
 import { jwtVerify } from "jose";
 import { NextResponse } from "next/server";
-import { notifyDesktopOAuthResult } from "@/lib/auth/desktop-oauth";
+import { buildDesktopOAuthRedirectUrl } from "@/lib/auth/desktop-oauth";
 import { exchangeGoogleCode, storeGmailConnection } from "@/services/gmail-service";
 import { env } from "@/lib/supabase/env";
 import { logActivity } from "@/services/activity-log-service";
@@ -13,10 +13,19 @@ function getStateSecret() {
   return new TextEncoder().encode(env.TOKEN_ENCRYPTION_KEY);
 }
 
+function redirectTo(location: string) {
+  return new NextResponse(null, {
+    headers: {
+      Location: location,
+    },
+    status: 302,
+  });
+}
+
 export async function GET(request: Request) {
   let payload:
     | {
-        desktopCallbackUrl?: string | null;
+        desktopReturnUrl?: string | null;
         workspaceId: string;
         userId: string;
       }
@@ -35,7 +44,7 @@ export async function GET(request: Request) {
 
     const verified = await jwtVerify(state, getStateSecret());
     payload = verified.payload as {
-      desktopCallbackUrl?: string | null;
+      desktopReturnUrl?: string | null;
       workspaceId: string;
       userId: string;
     };
@@ -54,7 +63,14 @@ export async function GET(request: Request) {
       targetId: (account as { id?: string }).id ?? null,
       metadata: { emailAddress: tokens.emailAddress },
     });
-    await notifyDesktopOAuthResult(payload.desktopCallbackUrl, { status: "connected" });
+
+    const desktopRedirect = buildDesktopOAuthRedirectUrl(payload.desktopReturnUrl, {
+      status: "connected",
+    });
+
+    if (desktopRedirect) {
+      return redirectTo(desktopRedirect);
+    }
 
     return NextResponse.redirect(
       new URL("/profile?gmail=connected", env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
@@ -64,10 +80,14 @@ export async function GET(request: Request) {
       error instanceof Error ? encodeURIComponent(error.message.slice(0, 160)) : "unknown-error";
 
     console.error("Gmail callback failed", error);
-    await notifyDesktopOAuthResult(payload?.desktopCallbackUrl, {
+    const desktopRedirect = buildDesktopOAuthRedirectUrl(payload?.desktopReturnUrl, {
       message,
       status: "error",
     });
+
+    if (desktopRedirect) {
+      return redirectTo(desktopRedirect);
+    }
 
     return NextResponse.redirect(
       new URL(

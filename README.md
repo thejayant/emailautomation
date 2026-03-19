@@ -77,14 +77,17 @@ docs/
 
 ## Windows desktop app
 
-The repo now includes an Electron-based Windows app shell in `windows-app/` that runs the same Next.js product locally.
+The repo now includes an Electron-based Windows app shell in `windows-app/` that loads the hosted OutboundFlow app and does not package backend secrets.
 
+- Start the web app locally: `npm run dev`
 - Start the desktop app in development: `npm run desktop:dev`
-- Build the standalone web bundle for desktop: `npm run desktop:build:web`
+- Build the safe desktop config: `npm run desktop:build:config`
 - Build the unpacked Windows app: `npm run desktop:build`
 - Build the NSIS installer: `npm run desktop:pack`
 
-Desktop builds reuse the shared project env values and override only the local app URL and Gmail callback URL at runtime.
+Desktop builds package only desktop-safe config such as the hosted app origin and custom protocol. Server secrets stay in the hosted web deployment.
+
+Release notes: [docs/vercel-desktop-release.md](/Users/admin/Desktop/AI/outboundflow/outboundflow-new/emailautomation/docs/vercel-desktop-release.md)
 
 ## Supabase setup
 

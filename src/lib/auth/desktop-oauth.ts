@@ -1,35 +1,38 @@
 export type DesktopOAuthStatus = "connected" | "error";
 
-export function parseDesktopCallbackUrl(value?: string | null) {
+const DESKTOP_PROTOCOL = "outboundflow:";
+
+export function parseDesktopReturnUrl(value?: string | null) {
   if (!value) {
     return null;
   }
 
   try {
     const url = new URL(value);
-    const isLoopbackHost = url.hostname === "127.0.0.1" || url.hostname === "localhost";
+    const isSupportedLocation =
+      url.hostname === "oauth-complete" || url.pathname === "/oauth-complete";
 
-    if (url.protocol !== "http:" || !isLoopbackHost) {
+    if (url.protocol !== DESKTOP_PROTOCOL || !isSupportedLocation) {
       return null;
     }
 
-    return url.toString();
+    return `${DESKTOP_PROTOCOL}//oauth-complete`;
   } catch {
     return null;
   }
 }
 
-export async function notifyDesktopOAuthResult(
-  desktopCallbackUrl: string | null | undefined,
+export function buildDesktopOAuthRedirectUrl(
+  desktopReturnUrl: string | null | undefined,
   input: {
     status: DesktopOAuthStatus;
     message?: string;
   },
 ) {
-  const targetUrl = parseDesktopCallbackUrl(desktopCallbackUrl);
+  const targetUrl = parseDesktopReturnUrl(desktopReturnUrl);
 
   if (!targetUrl) {
-    return;
+    return null;
   }
 
   const url = new URL(targetUrl);
@@ -39,12 +42,5 @@ export async function notifyDesktopOAuthResult(
     url.searchParams.set("message", input.message);
   }
 
-  try {
-    await fetch(url, {
-      cache: "no-store",
-      method: "GET",
-    });
-  } catch (error) {
-    console.error("Failed to notify the desktop shell about Gmail OAuth.", error);
-  }
+  return url.toString();
 }

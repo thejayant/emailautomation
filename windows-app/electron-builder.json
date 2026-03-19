@@ -1,6 +1,6 @@
 {
   "appId": "com.outboundflow.desktop",
-  "asar": false,
+  "asar": true,
   "directories": {
     "output": "windows-app/out"
   },
@@ -9,8 +9,8 @@
   },
   "files": [
     "windows-app/app-icon.ico",
+    "windows-app/.dist/**/*",
     "windows-app/src/**/*",
-    "windows-app/.app/**/*",
     "package.json"
   ],
   "nsis": {
@@ -20,6 +20,14 @@
     "oneClick": false,
     "shortcutName": "OutboundFlow"
   },
+  "protocols": [
+    {
+      "name": "OutboundFlow Desktop",
+      "schemes": [
+        "outboundflow"
+      ]
+    }
+  ],
   "productName": "OutboundFlow",
   "win": {
     "icon": "windows-app/app-icon.ico",

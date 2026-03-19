@@ -20,6 +20,7 @@
 # production
 /build
 /windows-app/.app
+/windows-app/.dist
 /windows-app/out
 
 # misc

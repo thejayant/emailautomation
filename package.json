@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "desktop:dev": "node windows-app/scripts/run-electron.cjs --dev",
-    "desktop:build:web": "node windows-app/scripts/build-next-desktop.cjs",
-    "desktop:build": "npm run desktop:build:web && electron-builder --dir --config windows-app/electron-builder.json",
-    "desktop:pack": "npm run desktop:build:web && electron-builder --config windows-app/electron-builder.json",
+    "desktop:build:config": "node windows-app/scripts/build-desktop-config.cjs",
+    "desktop:build": "npm run desktop:build:config && electron-builder --dir --config windows-app/electron-builder.json",
+    "desktop:pack": "npm run desktop:build:config && electron-builder --config windows-app/electron-builder.json",
     "lint": "eslint .",
     "test": "vitest run"
   },
