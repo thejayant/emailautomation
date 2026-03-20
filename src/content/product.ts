@@ -473,6 +473,7 @@ export const productContent: ProductContent = {
     ],
     helper: {
       title: "Workspace quick actions",
+      description: "Connect the sender mailbox and keep common workspace actions close at hand.",
     },
     signOutLabel: "Sign out",
   },
