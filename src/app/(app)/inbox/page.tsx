@@ -12,6 +12,9 @@ export default async function InboxPage() {
     subject: string | null;
     snippet: string | null;
     latest_message_at: string | null;
+    campaign_contact_id?: string | null;
+    campaign_status?: string | null;
+    reply_disposition?: string | null;
     messages: Array<{
       id: string;
       direction: string;

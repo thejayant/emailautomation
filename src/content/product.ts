@@ -761,24 +761,24 @@ export const productContent: ProductContent = {
     header: {
       eyebrow: "Campaigns",
       title: "Campaigns",
-      description: "Launch, pause, resume, and review two-step outbound programs.",
+      description: "Launch, pause, resume, and review tracked outbound workflows.",
       ctaLabel: "New campaign",
     },
     newCampaign: {
       eyebrow: "Campaign builder",
       title: "Launch a campaign",
-      description: "Choose the sender, audience, schedule, and message in one place.",
+      description: "Choose the sender, audience, schedule, and workflow in one place.",
     },
     editCampaign: {
       eyebrow: "Campaign editor",
       title: (campaignName) => `Edit ${campaignName}`,
       description:
-        "Update the mailbox, audience, schedule, and message without losing campaign history.",
+        "Update the mailbox, audience, schedule, and workflow without losing campaign history.",
     },
     detail: {
       eyebrow: "Campaign detail",
       description:
-        "Review queue state, step content, and pause or resume without leaving the campaign record.",
+        "Review queue state, workflow steps, and pause or resume without leaving the campaign record.",
       editLabel: "Edit campaign",
       openLabel: "Open",
       pauseLabel: "Pause campaign",

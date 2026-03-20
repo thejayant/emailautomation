@@ -2,6 +2,7 @@ import { CampaignWizard } from "@/components/campaigns/campaign-wizard";
 import { PageHeader } from "@/components/layout/page-header";
 import { productContent } from "@/content/product";
 import { getWorkspaceContext } from "@/lib/db/workspace";
+import { buildWorkflowDefinitionFromStoredSteps, normalizeWorkflowDefinition } from "@/lib/workflows/definition";
 import { getCampaignForEditing, listTemplates } from "@/services/campaign-service";
 import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
 import { listContacts } from "@/services/import-service";
@@ -15,7 +16,7 @@ export default async function EditCampaignPage({
   const workspace = await getWorkspaceContext();
   const [campaign, rawGmailAccounts, contacts, rawTemplates] = await Promise.all([
     getCampaignForEditing(campaignId, workspace.workspaceId),
-    getWorkspaceGmailAccounts(workspace.workspaceId),
+    getWorkspaceGmailAccounts(workspace.workspaceId, { onlyApproved: true }),
     listContacts(workspace.workspaceId),
     listTemplates(workspace.workspaceId),
   ]);
@@ -27,9 +28,9 @@ export default async function EditCampaignPage({
     body_template: string;
     body_html_template?: string | null;
   }>;
-  const steps = [...(campaign.campaign_steps ?? [])].sort((a, b) => a.step_number - b.step_number);
-  const primaryStep = steps.find((step) => step.step_number === 1);
-  const followupStep = steps.find((step) => step.step_number === 2);
+  const workflowDefinition = normalizeWorkflowDefinition(campaign.workflow_definition_jsonb);
+  const fallbackWorkflow = buildWorkflowDefinitionFromStoredSteps(campaign.campaign_steps ?? []);
+  const resolvedWorkflow = workflowDefinition.steps.length ? workflowDefinition : fallbackWorkflow;
 
   return (
     <div className="grid gap-8">
@@ -55,17 +56,18 @@ export default async function EditCampaignPage({
           sendWindowStart: campaign.send_window_start,
           sendWindowEnd: campaign.send_window_end,
           dailySendLimit: campaign.daily_send_limit,
-          primaryStep: {
-            subject: primaryStep?.subject_template ?? "",
-            mode: primaryStep?.body_html_template ? "html" : "text",
-            body: primaryStep?.body_template ?? "",
-            bodyHtml: primaryStep?.body_html_template ?? "",
-          },
-          followupStep: {
-            subject: followupStep?.subject_template ?? "",
-            mode: followupStep?.body_html_template ? "html" : "text",
-            body: followupStep?.body_template ?? "",
-            bodyHtml: followupStep?.body_html_template ?? "",
+          workflowDefinition: {
+            steps: resolvedWorkflow.steps.map((step) => ({
+              name: step.name,
+              waitDays: step.waitDays,
+              branchCondition: step.branchCondition,
+              onMatch: step.onMatch,
+              onNoMatch: step.onNoMatch,
+              subject: step.subject,
+              mode: step.mode,
+              body: step.body,
+              bodyHtml: step.bodyHtml,
+            })),
           },
         }}
       />

@@ -1,5 +1,6 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { requireSupabaseConfiguration } from "@/lib/supabase/env";
+import { isMissingColumnResult } from "@/lib/utils/supabase-schema";
 
 export async function getDashboardMetrics(workspaceId: string) {
   requireSupabaseConfiguration();
@@ -97,14 +98,27 @@ export async function listThreads(workspaceId: string) {
   requireSupabaseConfiguration();
 
   const supabase = createAdminSupabaseClient();
-  const { data, error } = await supabase
+  let result = await supabase
     .from("message_threads")
     .select(
-      "id, gmail_thread_id, subject, snippet, latest_message_at, thread_messages(id, direction, from_email, to_emails, subject, body_text, body_html, sent_at)",
+      "id, gmail_thread_id, subject, snippet, latest_message_at, campaign_contact_id, campaign_contact:campaign_contacts(status, reply_disposition), thread_messages(id, direction, from_email, to_emails, subject, body_text, body_html, sent_at)",
     )
     .eq("workspace_id", workspaceId)
     .order("latest_message_at", { ascending: false })
     .limit(20);
+
+  if (isMissingColumnResult(result, "campaign_contacts", "reply_disposition")) {
+    result = await supabase
+      .from("message_threads")
+      .select(
+        "id, gmail_thread_id, subject, snippet, latest_message_at, campaign_contact_id, campaign_contact:campaign_contacts(status), thread_messages(id, direction, from_email, to_emails, subject, body_text, body_html, sent_at)",
+      )
+      .eq("workspace_id", workspaceId)
+      .order("latest_message_at", { ascending: false })
+      .limit(20);
+  }
+
+  const { data, error } = result;
 
   if (error) {
     throw error;
@@ -115,6 +129,8 @@ export async function listThreads(workspaceId: string) {
     subject: string | null;
     snippet: string | null;
     latest_message_at: string | null;
+    campaign_contact_id?: string | null;
+    campaign_contact?: { status?: string | null; reply_disposition?: string | null } | null;
       thread_messages: Array<{
         id: string;
         direction: string;
@@ -130,6 +146,9 @@ export async function listThreads(workspaceId: string) {
     subject: thread.subject,
     snippet: thread.snippet,
     latest_message_at: thread.latest_message_at,
+    campaign_contact_id: thread.campaign_contact_id ?? null,
+    campaign_status: thread.campaign_contact?.status ?? null,
+    reply_disposition: thread.campaign_contact?.reply_disposition ?? null,
     messages:
       ((thread.thread_messages as Array<{
         id: string;

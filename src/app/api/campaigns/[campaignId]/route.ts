@@ -27,8 +27,7 @@ export async function PUT(
       sendWindowStart: payload.data.sendWindowStart,
       sendWindowEnd: payload.data.sendWindowEnd,
       dailySendLimit: payload.data.dailySendLimit,
-      primaryStep: payload.data.primaryStep,
-      followupStep: payload.data.followupStep,
+      workflowDefinition: payload.data.workflowDefinition,
     });
 
     await logActivity({

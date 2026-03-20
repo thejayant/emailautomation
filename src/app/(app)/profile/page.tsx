@@ -60,6 +60,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     id: string;
     email_address: string;
     status: string;
+    approval_status?: string | null;
+    approval_note?: string | null;
   }>;
   const gmailBanner = getGmailBanner(params.gmail, params.message);
 
@@ -103,7 +105,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               >
                 <div>
                   <p className="font-medium">{account.email_address}</p>
-                  <p className="text-muted-foreground">{account.status}</p>
+                  <p className="text-muted-foreground">
+                    {account.status} / {account.approval_status ?? "pending"}
+                  </p>
+                  {account.approval_note ? (
+                    <p className="text-xs text-muted-foreground">{account.approval_note}</p>
+                  ) : null}
                 </div>
                 <form action="/api/gmail/disconnect" method="post">
                   <input type="hidden" name="gmailAccountId" value={account.id} />

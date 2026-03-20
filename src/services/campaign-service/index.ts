@@ -4,9 +4,23 @@ import { createHash, randomUUID } from "crypto";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { env, requireSupabaseConfiguration } from "@/lib/supabase/env";
 import { escapeHtml, normalizeEmailHtmlDocument, stripHtmlToText } from "@/lib/utils/html";
+import { isAnyMissingColumnResult } from "@/lib/utils/supabase-schema";
 import { renderTemplate } from "@/lib/utils/template";
+import {
+  buildWorkflowDefinitionFromStoredSteps,
+  deriveCampaignStepsFromWorkflow,
+  getNextWorkflowStep,
+  getWorkflowStepByNumber,
+  normalizeWorkflowDefinition,
+  resolveWorkflowAdvance,
+  type CampaignWorkflowDefinition,
+  type StoredWorkflowEvent,
+  type WorkflowStepInput,
+} from "@/lib/workflows/definition";
 import { isWithinSendWindow } from "@/lib/utils/time";
+import { assertWorkspaceCanCreateCampaign, refreshWorkspaceUsageCounters } from "@/services/entitlement-service";
 import { getMailboxAccessTokenForAccount, sendWithMailboxProvider } from "@/services/gmail-service";
+import { instrumentHtmlForTracking, recordMessageEvent } from "@/services/telemetry-service";
 
 type CampaignStepInput = {
   subject: string;
@@ -35,12 +49,60 @@ type CampaignContactContext = {
   unsubscribed_at?: string | null;
 };
 
+function resolveCampaignWorkflowDefinition(input: {
+  workflowDefinition?: Partial<CampaignWorkflowDefinition> | null;
+  campaignSteps?: StoredCampaignStep[] | null;
+}) {
+  const normalized = normalizeWorkflowDefinition(input.workflowDefinition);
+
+  if (normalized.steps.length) {
+    return normalized;
+  }
+
+  return buildWorkflowDefinitionFromStoredSteps(input.campaignSteps ?? []);
+}
+
 function isCampaignSchemaCacheError(error: { message?: string | null; details?: string | null; hint?: string | null } | null | undefined) {
   const parts = [error?.message, error?.details, error?.hint].filter(Boolean).join(" ").toLowerCase();
+  const knownLaunchColumns = [
+    "body_html_template",
+    "preview_text",
+    "workflow_definition_jsonb",
+    "reply_disposition",
+    "meeting_booked_at",
+    "exit_reason",
+    "current_node_key",
+    "branch_history_jsonb",
+  ];
+
   return (
     parts.includes("schema cache") ||
     parts.includes("could not find the column") ||
-    parts.includes("body_html_template")
+    knownLaunchColumns.some((column) => parts.includes(column)) ||
+    /column\s+[a-z0-9_]+(?:_[0-9]+)?\.[a-z0-9_]+\s+does not exist/.test(parts)
+  );
+}
+
+function isCampaignSchemaResult(
+  result: {
+    error?: { message?: string | null; details?: string | null; hint?: string | null } | null;
+    status?: number | null;
+    data?: unknown;
+  } | null | undefined,
+) {
+  return (
+    isCampaignSchemaCacheError(result?.error) ||
+    isAnyMissingColumnResult(result, [
+      { table: "campaigns", column: "workflow_definition_jsonb" },
+      { table: "campaign_steps", column: "body_html_template" },
+      { table: "templates", column: "body_html_template" },
+      { table: "templates", column: "preview_text" },
+      { table: "campaign_contacts", column: "current_node_key" },
+      { table: "campaign_contacts", column: "branch_history_jsonb" },
+      { table: "campaign_contacts", column: "reply_disposition" },
+      { table: "campaign_contacts", column: "meeting_booked_at" },
+      { table: "campaign_contacts", column: "exit_reason" },
+    ])
   );
 }
 
@@ -103,66 +165,92 @@ function renderCampaignStepContent(step: StoredCampaignStep, contact: CampaignCo
   };
 }
 
+function stripUnsupportedCampaignContactFields(values: Record<string, unknown>) {
+  const fallbackValues = { ...values };
+  delete fallbackValues.current_node_key;
+  delete fallbackValues.branch_history_jsonb;
+  delete fallbackValues.exit_reason;
+  delete fallbackValues.reply_disposition;
+  delete fallbackValues.meeting_booked_at;
+
+  return fallbackValues;
+}
+
+async function updateCampaignContactRecord(campaignContactId: string, values: Record<string, unknown>) {
+  const supabase = createAdminSupabaseClient();
+  let result = await supabase
+    .from("campaign_contacts")
+    .update(values)
+    .eq("id", campaignContactId);
+
+  if (result.error && isCampaignSchemaCacheError(result.error)) {
+    result = await supabase
+      .from("campaign_contacts")
+      .update(stripUnsupportedCampaignContactFields(values))
+      .eq("id", campaignContactId);
+  }
+
+  if (result.error) {
+    throw result.error;
+  }
+}
+
+async function insertCampaignContacts(rows: Array<Record<string, unknown>>) {
+  const supabase = createAdminSupabaseClient();
+  let result = await supabase.from("campaign_contacts").insert(rows);
+
+  if (result.error && isCampaignSchemaCacheError(result.error)) {
+    result = await supabase
+      .from("campaign_contacts")
+      .insert(rows.map((row) => stripUnsupportedCampaignContactFields(row)));
+  }
+
+  if (result.error) {
+    throw result.error;
+  }
+}
+
 async function upsertCampaignSteps(input: {
   campaignId: string;
-  primaryStep: CampaignStepInput;
-  followupStep: CampaignStepInput;
+  workflowDefinition: CampaignWorkflowDefinition;
 }) {
   const supabase = createAdminSupabaseClient();
-  const normalizedPrimary = normalizeStepInput(input.primaryStep);
-  const normalizedFollowup = normalizeStepInput(input.followupStep);
-  const { error } = await supabase.from("campaign_steps").upsert(
-    [
-      {
-        campaign_id: input.campaignId,
-        step_number: 1,
-        step_type: "initial",
-        subject_template: normalizedPrimary.subject_template,
-        body_template: normalizedPrimary.body_template,
-        body_html_template: normalizedPrimary.body_html_template,
-        wait_days: 0,
-      },
-      {
-        campaign_id: input.campaignId,
-        step_number: 2,
-        step_type: "follow_up",
-        subject_template: normalizedFollowup.subject_template,
-        body_template: normalizedFollowup.body_template,
-        body_html_template: normalizedFollowup.body_html_template,
-        wait_days: env.FOLLOW_UP_DELAY_DAYS,
-      },
-    ],
-    { onConflict: "campaign_id,step_number" },
-  );
+  const normalizedWorkflow = normalizeWorkflowDefinition(input.workflowDefinition);
+  const stepRows = deriveCampaignStepsFromWorkflow(normalizedWorkflow).map((step) => ({
+    campaign_id: input.campaignId,
+    ...step,
+  }));
+
+  const { error: deleteError } = await supabase
+    .from("campaign_steps")
+    .delete()
+    .eq("campaign_id", input.campaignId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  const { error } = await supabase.from("campaign_steps").insert(stepRows);
 
   if (error) {
     if (isCampaignSchemaCacheError(error)) {
-      if (normalizedPrimary.body_html_template || normalizedFollowup.body_html_template) {
+      if (stepRows.some((step) => step.body_html_template)) {
         throw new Error(
           "HTML campaigns are not enabled in this database yet. Apply the latest Supabase migration to add campaign_steps.body_html_template before sending designed HTML emails.",
         );
       }
 
-      const fallback = await supabase.from("campaign_steps").upsert(
-        [
-          {
-            campaign_id: input.campaignId,
-            step_number: 1,
-            step_type: "initial",
-            subject_template: normalizedPrimary.subject_template,
-            body_template: normalizedPrimary.body_template,
-            wait_days: 0,
-          },
-          {
-            campaign_id: input.campaignId,
-            step_number: 2,
-            step_type: "follow_up",
-            subject_template: normalizedFollowup.subject_template,
-            body_template: normalizedFollowup.body_template,
-            wait_days: env.FOLLOW_UP_DELAY_DAYS,
-          },
-        ],
-        { onConflict: "campaign_id,step_number" },
+      const fallback = await supabase.from("campaign_steps").insert(
+        stepRows.map((step) => {
+          return {
+            campaign_id: step.campaign_id,
+            step_number: step.step_number,
+            step_type: step.step_type,
+            subject_template: step.subject_template,
+            body_template: step.body_template,
+            wait_days: step.wait_days,
+          };
+        }),
       );
 
       if (fallback.error) {
@@ -180,12 +268,12 @@ async function selectCampaignWithSteps(campaignId: string) {
   let result = await supabase
     .from("campaigns")
     .select(
-      "id, name, status, daily_send_limit, timezone, send_window_start, send_window_end, gmail_account_id, campaign_steps(id, step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(id, status, current_step, next_due_at, contact_id, contact:contacts(email, first_name, company))",
+      "id, name, status, daily_send_limit, timezone, send_window_start, send_window_end, gmail_account_id, workflow_definition_jsonb, campaign_steps(id, step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(id, status, current_step, next_due_at, contact_id, contact:contacts(email, first_name, company))",
     )
     .eq("id", campaignId)
     .single();
 
-  if (result.error && isCampaignSchemaCacheError(result.error)) {
+  if (isCampaignSchemaResult(result)) {
     result = await supabase
       .from("campaigns")
       .select(
@@ -207,13 +295,13 @@ async function selectCampaignForEditing(campaignId: string, workspaceId: string)
   let result = await supabase
     .from("campaigns")
     .select(
-      "id, workspace_id, name, status, gmail_account_id, daily_send_limit, timezone, send_window_start, send_window_end, campaign_steps(step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(contact_id, status, current_step)",
+      "id, workspace_id, name, status, gmail_account_id, daily_send_limit, timezone, send_window_start, send_window_end, workflow_definition_jsonb, campaign_steps(step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(contact_id, status, current_step)",
     )
     .eq("id", campaignId)
     .eq("workspace_id", workspaceId)
     .single();
 
-  if (result.error && isCampaignSchemaCacheError(result.error)) {
+  if (isCampaignSchemaResult(result)) {
     result = await supabase
       .from("campaigns")
       .select(
@@ -237,11 +325,11 @@ export async function listTemplates(workspaceId: string) {
   const supabase = createAdminSupabaseClient();
   let result = await supabase
     .from("templates")
-    .select("id, name, subject_template, body_template, body_html_template, created_at")
+    .select("id, name, subject_template, body_template, body_html_template, preview_text, created_at")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
 
-  if (result.error && isCampaignSchemaCacheError(result.error)) {
+  if (isCampaignSchemaResult(result)) {
     result = await supabase
       .from("templates")
       .select("id, name, subject_template, body_template, created_at")
@@ -259,10 +347,12 @@ export async function listTemplates(workspaceId: string) {
     subject_template: string;
     body_template: string;
     body_html_template?: string | null;
+    preview_text?: string | null;
     created_at: string;
   }>).map((template) => ({
     ...template,
     body_html_template: template.body_html_template ?? null,
+    preview_text: template.preview_text ?? template.body_template.slice(0, 180),
   }));
 }
 
@@ -276,6 +366,7 @@ export async function saveTemplate(input: {
   bodyHtmlTemplate?: string | null;
 }) {
   requireSupabaseConfiguration();
+  await assertWorkspaceCanCreateCampaign(input.workspaceId);
 
   const supabase = createAdminSupabaseClient();
   const normalized = normalizeStepInput({
@@ -291,6 +382,7 @@ export async function saveTemplate(input: {
     subject_template: normalized.subject_template,
     body_template: normalized.body_template,
     body_html_template: normalized.body_html_template,
+    preview_text: (normalized.body_template || stripHtmlToText(normalized.body_html_template ?? "")).slice(0, 180),
   };
   const { data, error } = await supabase
     .from("templates")
@@ -365,6 +457,7 @@ export async function getCampaignById(campaignId: string) {
     daily_send_limit: number;
     timezone: string;
     gmail_account_id: string;
+    workflow_definition_jsonb?: Partial<CampaignWorkflowDefinition> | null;
     send_window_start?: string | null;
     send_window_end?: string | null;
     campaign_steps?: StoredCampaignStep[] | null;
@@ -393,6 +486,7 @@ export async function getCampaignForEditing(campaignId: string, workspaceId: str
     timezone: string;
     send_window_start: string;
     send_window_end: string;
+    workflow_definition_jsonb?: Partial<CampaignWorkflowDefinition> | null;
     campaign_steps?: StoredCampaignStep[] | null;
     campaign_contacts?: Array<{
       contact_id: string;
@@ -407,6 +501,8 @@ type DueCampaignContact = {
   campaign_id: string;
   contact_id: string;
   current_step: number;
+  current_node_key?: string | null;
+  branch_history_jsonb?: Array<Record<string, unknown>> | null;
   status: string;
   failed_attempts: number;
   next_due_at: string | null;
@@ -418,6 +514,7 @@ type DueCampaignContact = {
     name: string;
     status: string;
     gmail_account_id: string;
+    workflow_definition_jsonb?: Partial<CampaignWorkflowDefinition> | null;
     daily_send_limit: number;
     send_window_start: string;
     send_window_end: string;
@@ -443,7 +540,20 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
     return { processed: false, reason: "outside_window" as const };
   }
 
-  const step = (campaign.campaign_steps ?? []).find((candidate) => candidate.step_number === item.current_step);
+  const workflowDefinition = resolveCampaignWorkflowDefinition({
+    workflowDefinition: campaign.workflow_definition_jsonb,
+    campaignSteps: campaign.campaign_steps,
+  });
+  const workflowStep = getWorkflowStepByNumber(workflowDefinition, item.current_step);
+  const step = workflowStep
+    ? {
+        step_number: workflowStep.stepNumber,
+        subject_template: workflowStep.subject,
+        body_template: workflowStep.body,
+        body_html_template: workflowStep.mode === "html" ? workflowStep.bodyHtml || null : null,
+        wait_days: workflowStep.waitDays,
+      }
+    : null;
 
   if (!step || !contact.email) {
     return { processed: false, reason: "missing_step" as const };
@@ -454,33 +564,97 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
   );
 
   if (existingMessage) {
-    return { processed: false, reason: "already_sent" as const };
+    const { data: rawEvents, error: eventsError } = await supabase
+      .from("message_events")
+      .select("event_type, metadata")
+      .eq("campaign_contact_id", item.id)
+      .order("occurred_at", { ascending: true });
+
+    if (eventsError) {
+      throw eventsError;
+    }
+
+    const events = ((rawEvents ?? []) as Array<{
+      event_type: string;
+      metadata?: { stepNumber?: number | string | null } | null;
+    }>).map((event) => ({
+      eventType: event.event_type,
+      stepNumber: event.metadata?.stepNumber ? Number(event.metadata.stepNumber) : null,
+    })) as StoredWorkflowEvent[];
+    const resolution = resolveWorkflowAdvance({
+      definition: workflowDefinition,
+      stepNumber: item.current_step,
+      events,
+    });
+
+    if (resolution.action === "advance") {
+      const nextDueAt = new Date().toISOString();
+      const branchHistory = [...(item.branch_history_jsonb ?? []), {
+        fromStep: item.current_step,
+        toStep: resolution.nextStep.stepNumber,
+        matched: resolution.matched,
+        branchCondition: workflowStep?.branchCondition ?? "time",
+        reason: resolution.transitionReason,
+        resolvedAt: nextDueAt,
+      }];
+      await updateCampaignContactRecord(item.id, {
+        status: resolution.nextStep.stepNumber > 1 ? "followup_due" : "queued",
+        current_step: resolution.nextStep.stepNumber,
+        current_node_key: resolution.nextStep.key,
+        branch_history_jsonb: branchHistory,
+        next_due_at: nextDueAt,
+        error_message: null,
+      });
+
+      return { processed: false, reason: "advanced" as const };
+    }
+
+    await updateCampaignContactRecord(item.id, {
+      status: item.current_step > 1 ? "followup_sent" : "sent",
+      current_node_key: null,
+      next_due_at: null,
+      exit_reason: resolution.exitReason,
+      error_message: null,
+    });
+
+    return { processed: false, reason: "workflow_exit" as const };
   }
 
   try {
     const mailbox = await getMailboxAccessTokenForAccount(campaign.gmail_account_id);
     const unsubscribeToken = randomUUID();
     const rendered = renderCampaignStepContent(step, contact, buildUnsubscribeLink(unsubscribeToken));
+    const trackedHtml = await instrumentHtmlForTracking({
+      workspaceId: campaign.workspace_id,
+      campaignContactId: item.id,
+      stepNumber: item.current_step,
+      html: rendered.bodyHtml,
+    });
     const sendResult = await sendWithMailboxProvider({
       accessToken: mailbox.accessToken,
       fromEmail: mailbox.emailAddress,
       toEmail: contact.email,
       subject: rendered.subject,
-      bodyHtml: rendered.bodyHtml,
+      bodyHtml: trackedHtml,
       bodyText: rendered.bodyText,
-      replyThreadId: item.current_step === 2 ? item.last_thread_id : null,
+      replyThreadId: item.current_step > 1 ? item.last_thread_id : null,
     });
 
     const sentAt = new Date().toISOString();
+    const nextWorkflowStep = getNextWorkflowStep(workflowDefinition, item.current_step);
 
-    await supabase.from("outbound_messages").insert({
+    const { data: outboundMessage, error: outboundMessageError } = await supabase.from("outbound_messages").insert({
       campaign_contact_id: item.id,
       gmail_message_id: sendResult.messageId ?? null,
       gmail_thread_id: sendResult.threadId ?? null,
       step_number: item.current_step,
       sent_at: sentAt,
       status: "sent",
-    });
+    }).select("id").single();
+
+    if (outboundMessageError) {
+      throw outboundMessageError;
+    }
 
     await supabase.from("message_threads").upsert({
       workspace_id: campaign.workspace_id,
@@ -498,17 +672,28 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
       token_hash: hashToken(unsubscribeToken),
     });
 
-    await supabase
-      .from("campaign_contacts")
-      .update({
-        status: item.current_step === 1 ? "followup_due" : "followup_sent",
-        current_step: item.current_step === 1 ? 2 : item.current_step,
-        next_due_at: item.current_step === 1 ? scheduleFollowup(sentAt) : null,
-        last_thread_id: sendResult.threadId ?? null,
-        last_message_id: sendResult.messageId ?? null,
-        error_message: null,
-      })
-      .eq("id", item.id);
+    await updateCampaignContactRecord(item.id, {
+      status: nextWorkflowStep ? "sent" : item.current_step > 1 ? "followup_sent" : "sent",
+      current_step: item.current_step,
+      current_node_key: workflowStep?.key ?? `step-${item.current_step}`,
+      next_due_at: nextWorkflowStep ? addDays(new Date(sentAt), Math.max(step.wait_days ?? 0, 0)).toISOString() : null,
+      last_thread_id: sendResult.threadId ?? null,
+      last_message_id: sendResult.messageId ?? null,
+      error_message: null,
+    });
+
+    await recordMessageEvent({
+      workspaceId: campaign.workspace_id,
+      campaignContactId: item.id,
+      outboundMessageId: (outboundMessage as { id?: string } | null)?.id ?? null,
+      gmailMessageId: sendResult.messageId ?? null,
+      eventType: "sent",
+      metadata: {
+        stepNumber: item.current_step,
+        subject: rendered.subject,
+        toEmail: contact.email,
+      },
+    });
 
     return { processed: true, reason: "sent" as const };
   } catch (error) {
@@ -535,13 +720,14 @@ export async function createCampaign(input: {
   sendWindowStart: string;
   sendWindowEnd: string;
   dailySendLimit: number;
-  primaryStep: CampaignStepInput;
-  followupStep: CampaignStepInput;
+  workflowDefinition: { version?: number; steps?: WorkflowStepInput[] };
 }) {
   requireSupabaseConfiguration();
+  await assertWorkspaceCanCreateCampaign(input.workspaceId);
+  const workflowDefinition = normalizeWorkflowDefinition(input.workflowDefinition);
 
   const supabase = createAdminSupabaseClient();
-  const { data: rawCampaign, error } = await supabase
+  let createResult = await supabase
     .from("campaigns")
     .insert({
       workspace_id: input.workspaceId,
@@ -553,10 +739,32 @@ export async function createCampaign(input: {
       send_window_start: input.sendWindowStart,
       send_window_end: input.sendWindowEnd,
       timezone: input.timezone,
+      workflow_definition_jsonb: workflowDefinition,
       allowed_send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
     })
     .select("id")
     .single();
+
+  if (isCampaignSchemaResult(createResult)) {
+    createResult = await supabase
+      .from("campaigns")
+      .insert({
+        workspace_id: input.workspaceId,
+        owner_user_id: input.userId,
+        name: input.campaignName,
+        status: "active",
+        gmail_account_id: input.gmailAccountId,
+        daily_send_limit: input.dailySendLimit,
+        send_window_start: input.sendWindowStart,
+        send_window_end: input.sendWindowEnd,
+        timezone: input.timezone,
+        allowed_send_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+      })
+      .select("id")
+      .single();
+  }
+
+  const { data: rawCampaign, error } = createResult;
 
   if (error) {
     throw error;
@@ -566,20 +774,22 @@ export async function createCampaign(input: {
 
   await upsertCampaignSteps({
     campaignId: campaign.id,
-    primaryStep: input.primaryStep,
-    followupStep: input.followupStep,
+    workflowDefinition,
   });
 
-  await supabase.from("campaign_contacts").insert(
+  await insertCampaignContacts(
     input.targetContactIds.map((contactId) => ({
       campaign_id: campaign.id,
       contact_id: contactId,
       status: "queued",
       current_step: 1,
+      current_node_key: workflowDefinition.steps[0]?.key ?? "step-1",
       next_due_at: new Date().toISOString(),
       failed_attempts: 0,
     })),
   );
+
+  await refreshWorkspaceUsageCounters(input.workspaceId);
 
   return { id: campaign.id, launched: true };
 }
@@ -594,10 +804,10 @@ export async function updateCampaign(input: {
   sendWindowStart: string;
   sendWindowEnd: string;
   dailySendLimit: number;
-  primaryStep: CampaignStepInput;
-  followupStep: CampaignStepInput;
+  workflowDefinition: { version?: number; steps?: WorkflowStepInput[] };
 }) {
   requireSupabaseConfiguration();
+  const workflowDefinition = normalizeWorkflowDefinition(input.workflowDefinition);
 
   const supabase = createAdminSupabaseClient();
   const { data: campaign, error: campaignError } = await supabase
@@ -624,18 +834,37 @@ export async function updateCampaign(input: {
       send_window_start: input.sendWindowStart,
       send_window_end: input.sendWindowEnd,
       timezone: input.timezone,
+      workflow_definition_jsonb: workflowDefinition,
     })
     .eq("id", input.campaignId)
     .eq("workspace_id", input.workspaceId);
 
-  if (updateError) {
+  if (updateError && !isCampaignSchemaCacheError(updateError)) {
     throw updateError;
+  }
+
+  if (updateError && isCampaignSchemaCacheError(updateError)) {
+    const { error: fallbackUpdateError } = await supabase
+      .from("campaigns")
+      .update({
+        name: input.campaignName,
+        gmail_account_id: input.gmailAccountId,
+        daily_send_limit: input.dailySendLimit,
+        send_window_start: input.sendWindowStart,
+        send_window_end: input.sendWindowEnd,
+        timezone: input.timezone,
+      })
+      .eq("id", input.campaignId)
+      .eq("workspace_id", input.workspaceId);
+
+    if (fallbackUpdateError) {
+      throw fallbackUpdateError;
+    }
   }
 
   await upsertCampaignSteps({
     campaignId: input.campaignId,
-    primaryStep: input.primaryStep,
-    followupStep: input.followupStep,
+    workflowDefinition,
   });
 
   const { data: existingContacts, error: contactsError } = await supabase
@@ -661,15 +890,13 @@ export async function updateCampaign(input: {
   for (const contact of currentContacts) {
     if (selectedIds.has(contact.contact_id)) {
       if (contact.status === "skipped" && !(contact.outbound_messages?.length ?? 0)) {
-        await supabase
-          .from("campaign_contacts")
-          .update({
-            status: "queued",
-            current_step: 1,
-            next_due_at: new Date().toISOString(),
-            error_message: null,
-          })
-          .eq("id", contact.id);
+        await updateCampaignContactRecord(contact.id, {
+          status: "queued",
+          current_step: 1,
+          current_node_key: workflowDefinition.steps[0]?.key ?? "step-1",
+          next_due_at: new Date().toISOString(),
+          error_message: null,
+        });
       }
 
       continue;
@@ -695,20 +922,17 @@ export async function updateCampaign(input: {
   const contactsToInsert = input.targetContactIds.filter((contactId) => !existingIds.has(contactId));
 
   if (contactsToInsert.length) {
-    const { error: insertError } = await supabase.from("campaign_contacts").insert(
+    await insertCampaignContacts(
       contactsToInsert.map((contactId) => ({
         campaign_id: input.campaignId,
         contact_id: contactId,
         status: "queued",
         current_step: 1,
+        current_node_key: workflowDefinition.steps[0]?.key ?? "step-1",
         next_due_at: new Date().toISOString(),
         failed_attempts: 0,
       })),
     );
-
-    if (insertError) {
-      throw insertError;
-    }
   }
 
   return { id: input.campaignId, updated: true };
@@ -728,6 +952,8 @@ export async function deleteCampaign(campaignId: string, workspaceId: string) {
     throw error;
   }
 
+  await refreshWorkspaceUsageCounters(workspaceId);
+
   return { campaignId, deleted: true };
 }
 
@@ -736,6 +962,18 @@ export async function pauseCampaign(campaignId: string, status: "paused" | "acti
 
   const supabase = createAdminSupabaseClient();
   await supabase.from("campaigns").update({ status }).eq("id", campaignId);
+
+  const { data: rawCampaign } = await supabase
+    .from("campaigns")
+    .select("workspace_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const campaign = rawCampaign as { workspace_id?: string | null } | null;
+
+  if (campaign?.workspace_id) {
+    await refreshWorkspaceUsageCounters(campaign.workspace_id);
+  }
+
   return { campaignId, status };
 }
 
@@ -774,7 +1012,7 @@ export async function sendCampaignNow(campaignId: string, workspaceId: string) {
     throw new Error("Campaign not found.");
   }
 
-  const { data, error } = await supabase
+  let dueContactsResult = await supabase
     .from("campaign_contacts")
     .select(
       `
@@ -782,6 +1020,8 @@ export async function sendCampaignNow(campaignId: string, workspaceId: string) {
       campaign_id,
       contact_id,
       current_step,
+      current_node_key,
+      branch_history_jsonb,
       status,
       failed_attempts,
       next_due_at,
@@ -793,6 +1033,7 @@ export async function sendCampaignNow(campaignId: string, workspaceId: string) {
         name,
         status,
         gmail_account_id,
+        workflow_definition_jsonb,
         daily_send_limit,
         send_window_start,
         send_window_end,
@@ -803,60 +1044,48 @@ export async function sendCampaignNow(campaignId: string, workspaceId: string) {
     `,
     )
     .eq("campaign_id", campaignId)
-    .in("status", ["queued", "followup_due"])
+    .in("status", ["queued", "followup_due", "sent"])
     .lte("next_due_at", new Date().toISOString())
     .order("next_due_at", { ascending: true });
 
-  if (error) {
-    if (isCampaignSchemaCacheError(error)) {
-      const fallback = await supabase
-        .from("campaign_contacts")
-        .select(
-          `
+  if (isCampaignSchemaResult(dueContactsResult)) {
+    dueContactsResult = await supabase
+      .from("campaign_contacts")
+      .select(
+        `
+        id,
+        campaign_id,
+        contact_id,
+        current_step,
+        status,
+        failed_attempts,
+        next_due_at,
+        last_thread_id,
+        contact:contacts(email, first_name, last_name, company, website, job_title, custom_fields_jsonb, unsubscribed_at),
+        campaign:campaigns(
           id,
-          campaign_id,
-          contact_id,
-          current_step,
+          workspace_id,
+          name,
           status,
-          failed_attempts,
-          next_due_at,
-          last_thread_id,
-          contact:contacts(email, first_name, last_name, company, website, job_title, custom_fields_jsonb, unsubscribed_at),
-          campaign:campaigns(
-            id,
-            workspace_id,
-            name,
-            status,
-            gmail_account_id,
-            daily_send_limit,
-            send_window_start,
-            send_window_end,
-            timezone,
-            campaign_steps(step_number, step_type, subject_template, body_template, wait_days)
-          ),
-          outbound_messages(step_number)
-        `,
-        )
-        .eq("campaign_id", campaignId)
-        .in("status", ["queued", "followup_due"])
-        .lte("next_due_at", new Date().toISOString())
-        .order("next_due_at", { ascending: true });
+          gmail_account_id,
+          daily_send_limit,
+          send_window_start,
+          send_window_end,
+          timezone,
+          campaign_steps(step_number, step_type, subject_template, body_template, body_html_template, wait_days)
+        ),
+        outbound_messages(step_number)
+      `,
+      )
+      .eq("campaign_id", campaignId)
+      .in("status", ["queued", "followup_due", "sent"])
+      .lte("next_due_at", new Date().toISOString())
+      .order("next_due_at", { ascending: true });
+  }
 
-      if (fallback.error) {
-        throw fallback.error;
-      }
+  const { data, error } = dueContactsResult;
 
-      let processed = 0;
-
-      for (const item of (fallback.data ?? []) as DueCampaignContact[]) {
-        const result = await processCampaignContact(item, { ignoreSendWindow: true });
-        if (result.processed) {
-          processed += 1;
-        }
-      }
-
-      return { campaignId, processed };
-    }
+  if (error) {
     throw error;
   }
 

@@ -20,6 +20,28 @@ function decodeBase64Url(value?: string | null) {
   return atob(normalized);
 }
 
+function classifyReplyDisposition(content: string) {
+  const normalized = content.toLowerCase();
+
+  if (/\b(stop|unsubscribe|remove me|do not contact|don't contact|opt out)\b/.test(normalized)) {
+    return "negative";
+  }
+
+  if (/\b(booked|calendar invite|meeting confirmed|scheduled|lets meet|let's meet)\b/.test(normalized)) {
+    return "booked";
+  }
+
+  if (/\b(interested|sounds good|yes|let's talk|lets talk|available)\b/.test(normalized)) {
+    return "positive";
+  }
+
+  if (/\?/.test(normalized) || /\b(question|more info|details)\b/.test(normalized)) {
+    return "question";
+  }
+
+  return "other";
+}
+
 async function resolveMailboxAccess(mailbox: {
   oauth_connection?: {
     id?: string;
@@ -71,7 +93,7 @@ Deno.serve(async (request) => {
 
   const { data: mailboxes, error } = await supabase
     .from("gmail_accounts")
-    .select("id, workspace_id, email_address, last_history_id, oauth_connection:oauth_connections(id, access_token_encrypted, refresh_token_encrypted, token_expiry)")
+    .select("id, workspace_id, email_address, approval_status, last_history_id, oauth_connection:oauth_connections(id, access_token_encrypted, refresh_token_encrypted, token_expiry)")
     .eq("status", "active");
 
   if (error) {
@@ -81,21 +103,34 @@ Deno.serve(async (request) => {
   let synced = 0;
 
   for (const mailbox of mailboxes ?? []) {
+    if (mailbox.approval_status && mailbox.approval_status !== "approved") {
+      continue;
+    }
+
     const accessToken = await resolveMailboxAccess(mailbox);
     const threadList = await gmailListThreads(accessToken);
 
     for (const threadSummary of threadList.threads ?? []) {
       const thread = await gmailGetThread(accessToken, threadSummary.id);
       const messages = thread.messages ?? [];
+      const latestMessageAt = Math.max(
+        ...messages.map((message: { internalDate?: string }) => Number(message.internalDate ?? Date.now())),
+      );
+      const { data: existingThread } = await supabase
+        .from("message_threads")
+        .select("id, campaign_contact_id")
+        .eq("gmail_thread_id", thread.id)
+        .maybeSingle();
 
       await supabase.from("message_threads").upsert({
         workspace_id: mailbox.workspace_id,
         gmail_thread_id: thread.id,
+        campaign_contact_id: existingThread?.campaign_contact_id ?? null,
         subject:
           messages[0]?.payload?.headers?.find((header: { name?: string }) => header.name === "Subject")?.value ??
           null,
         snippet: thread.snippet ?? null,
-        latest_message_at: new Date().toISOString(),
+        latest_message_at: new Date(latestMessageAt).toISOString(),
       });
 
       for (const message of messages) {
@@ -134,14 +169,49 @@ Deno.serve(async (request) => {
             .maybeSingle();
 
           if (threadRecord?.campaign_contact_id) {
+            const sentAt = new Date(Number(message.internalDate ?? Date.now())).toISOString();
+            const disposition = classifyReplyDisposition(
+              [headers.Subject ?? "", bodyText ?? "", message.snippet ?? ""].filter(Boolean).join("\n"),
+            );
+            const nextStatus =
+              disposition === "negative"
+                ? "unsubscribed"
+                : disposition === "booked"
+                  ? "meeting_booked"
+                  : "replied";
             await supabase
               .from("campaign_contacts")
               .update({
-                status: "replied",
-                replied_at: new Date(Number(message.internalDate ?? Date.now())).toISOString(),
+                status: nextStatus,
+                replied_at: sentAt,
+                reply_disposition: disposition,
+                meeting_booked_at: disposition === "booked" ? sentAt : null,
+                exit_reason:
+                  disposition === "negative"
+                    ? "negative_reply"
+                    : disposition === "booked"
+                      ? "meeting_booked"
+                      : "reply_received",
                 next_due_at: null,
               })
               .eq("id", threadRecord.campaign_contact_id);
+
+            await supabase.from("message_events").insert({
+              workspace_id: mailbox.workspace_id,
+              campaign_contact_id: threadRecord.campaign_contact_id,
+              gmail_message_id: message.id,
+              event_type:
+                disposition === "negative"
+                  ? "unsubscribed"
+                  : disposition === "booked"
+                    ? "meeting_booked"
+                    : "replied",
+              metadata: {
+                disposition,
+                fromEmail,
+                subject: headers.Subject ?? null,
+              },
+            });
           }
         }
       }

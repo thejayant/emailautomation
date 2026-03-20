@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { productContent } from "@/content/product";
+import { buildWorkflowDefinitionFromStoredSteps, normalizeWorkflowDefinition } from "@/lib/workflows/definition";
 import { getCampaignById } from "@/services/campaign-service";
 import Link from "next/link";
 
@@ -31,6 +32,7 @@ export default async function CampaignDetailPage({
     status: string;
     daily_send_limit: number;
     timezone: string;
+    workflow_definition_jsonb?: Record<string, unknown> | null;
     send_window_start?: string | null;
     send_window_end?: string | null;
     campaign_steps?: Array<{
@@ -45,6 +47,9 @@ export default async function CampaignDetailPage({
     contacts?: CampaignContactRow[];
   };
   const campaignContacts = (campaign.campaign_contacts ?? campaign.contacts ?? []) as CampaignContactRow[];
+  const workflowDefinition = normalizeWorkflowDefinition(campaign.workflow_definition_jsonb);
+  const fallbackWorkflow = buildWorkflowDefinitionFromStoredSteps(campaign.campaign_steps ?? []);
+  const resolvedWorkflow = workflowDefinition.steps.length ? workflowDefinition : fallbackWorkflow;
 
   return (
     <div className="grid gap-8">
@@ -94,34 +99,36 @@ export default async function CampaignDetailPage({
         </Card>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        {(campaign.campaign_steps ?? [])
-          .slice()
-          .sort((a, b) => a.step_number - b.step_number)
+        {resolvedWorkflow.steps
           .map((step) => (
-            <Card key={step.step_number}>
+            <Card key={step.stepNumber}>
               <CardHeader>
                 <CardTitle>
                   {productContent.campaigns.detail.stepTitle(
-                    step.step_number,
-                    step.step_type === "follow_up"
-                      ? productContent.campaigns.detail.followupStepLabel
-                      : productContent.campaigns.detail.primaryStepLabel,
+                    step.stepNumber,
+                    step.name,
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
                 <div className="flex items-center gap-2">
-                  <Badge variant="neutral">{step.body_html_template ? "HTML" : "Text"}</Badge>
+                  <Badge variant="neutral">{step.mode === "html" ? "HTML" : "Text"}</Badge>
+                  <Badge variant="neutral">{`Wait ${step.waitDays}d`}</Badge>
+                  <Badge variant="neutral">{`Branch ${step.branchCondition}`}</Badge>
                 </div>
                 <div className="grid gap-1">
                   <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{productContent.campaigns.detail.subjectLabel}</p>
-                  <p className="font-medium">{step.subject_template}</p>
+                  <p className="font-medium">{step.subject}</p>
                 </div>
                 <div className="grid gap-1">
                   <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{productContent.campaigns.detail.bodyPreviewLabel}</p>
                   <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                    {step.body_html_template ? productContent.campaigns.detail.htmlBodyPreviewLabel : step.body_template}
+                    {step.mode === "html" ? productContent.campaigns.detail.htmlBodyPreviewLabel : step.body}
                   </p>
+                </div>
+                <div className="grid gap-1 text-sm text-muted-foreground">
+                  <p>On match: {step.onMatch.replace(/_/g, " ")}</p>
+                  <p>On no match: {step.onNoMatch.replace(/_/g, " ")}</p>
                 </div>
               </CardContent>
             </Card>

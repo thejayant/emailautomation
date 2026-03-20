@@ -9,7 +9,7 @@ import { listContacts } from "@/services/import-service";
 export default async function NewCampaignPage() {
   const workspace = await getWorkspaceContext();
   const [rawGmailAccounts, rawContacts, rawTemplates] = await Promise.all([
-    getWorkspaceGmailAccounts(workspace.workspaceId),
+    getWorkspaceGmailAccounts(workspace.workspaceId, { onlyApproved: true }),
     listContacts(workspace.workspaceId),
     listTemplates(workspace.workspaceId),
   ]);

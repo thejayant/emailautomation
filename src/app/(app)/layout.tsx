@@ -23,5 +23,13 @@ export default async function ProtectedAppLayout({
     throw error;
   }
 
-  return <AppShell brandSubtitle={workspace.workspaceLabel}>{children}</AppShell>;
+  return (
+    <AppShell
+      brandSubtitle={workspace.workspaceLabel}
+      activeWorkspaceId={workspace.workspaceId}
+      workspaces={workspace.availableWorkspaces}
+    >
+      {children}
+    </AppShell>
+  );
 }

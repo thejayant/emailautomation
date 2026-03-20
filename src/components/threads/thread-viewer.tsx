@@ -17,6 +17,9 @@ type Thread = {
   subject: string | null;
   snippet: string | null;
   latest_message_at: string | null;
+  campaign_contact_id?: string | null;
+  campaign_status?: string | null;
+  reply_disposition?: string | null;
   messages: Array<{
     id: string;
     direction: string;
@@ -39,6 +42,34 @@ export function ThreadViewer({ threads }: { threads: Thread[] }) {
     [selectedThreadId, threads],
   );
   const viewerCopy = productContent.inbox.viewer;
+
+  function handleDisposition(replyDisposition: "negative" | "booked" | "positive" | "question" | "other") {
+    if (!selectedThread) {
+      return;
+    }
+
+    startTransition(async () => {
+      const response = await fetch("/api/inbox/disposition", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          threadRecordId: selectedThread.id,
+          replyDisposition,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        toast.error(payload?.error ?? "Failed to update reply disposition");
+        return;
+      }
+
+      router.refresh();
+      toast.success(`Marked thread as ${replyDisposition}.`);
+    });
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -69,9 +100,38 @@ export function ThreadViewer({ threads }: { threads: Thread[] }) {
       </Card>
       <Card className="card-shadow">
         <CardHeader>
-          <CardTitle>{selectedThread?.subject ?? viewerCopy.emptyThreadTitle}</CardTitle>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <CardTitle>{selectedThread?.subject ?? viewerCopy.emptyThreadTitle}</CardTitle>
+            {selectedThread?.reply_disposition ? (
+              <Badge variant={selectedThread.reply_disposition === "negative" ? "danger" : selectedThread.reply_disposition === "booked" ? "success" : "neutral"}>
+                {selectedThread.reply_disposition}
+              </Badge>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4">
+          {selectedThread?.campaign_contact_id ? (
+            <div className="glass-control flex flex-wrap items-center gap-2 rounded-[1.25rem] p-3">
+              <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Workflow disposition
+              </span>
+              <Button size="sm" variant="outline" type="button" disabled={isPending} onClick={() => handleDisposition("negative")}>
+                Stop
+              </Button>
+              <Button size="sm" variant="outline" type="button" disabled={isPending} onClick={() => handleDisposition("booked")}>
+                Booked
+              </Button>
+              <Button size="sm" variant="outline" type="button" disabled={isPending} onClick={() => handleDisposition("positive")}>
+                Positive
+              </Button>
+              <Button size="sm" variant="outline" type="button" disabled={isPending} onClick={() => handleDisposition("question")}>
+                Question
+              </Button>
+              <Button size="sm" variant="outline" type="button" disabled={isPending} onClick={() => handleDisposition("other")}>
+                Other
+              </Button>
+            </div>
+          ) : null}
           {selectedThread ? (
             (selectedThread.messages ?? []).map((message) => (
               <div

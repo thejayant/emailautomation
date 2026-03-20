@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import type { Control, UseFormRegister, UseFormSetValue } from "react-hook-form";
-import { useForm, useWatch } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 import { productContent } from "@/content/product";
 import type { ContactRecord } from "@/lib/types/contact";
 import { previewRenderedTemplate } from "@/lib/utils/template";
-import { campaignLaunchSchema } from "@/lib/zod/schemas";
+import { campaignBuilderSchema } from "@/lib/zod/schemas";
 import { ManualContactForm } from "@/components/forms/manual-contact-form";
 import { SafeHtmlContent } from "@/components/shared/safe-html-content";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
-type CampaignFormValues = z.input<typeof campaignLaunchSchema>;
+type CampaignFormValues = z.input<typeof campaignBuilderSchema>;
+type WorkflowStepPath = `workflowDefinition.steps.${number}`;
 
 type WizardProps = {
   gmailAccounts: Array<{ id: string; email_address: string }>;
@@ -39,9 +40,9 @@ type WizardProps = {
 };
 
 type StepEditorProps = {
-  title: string;
-  description: string;
-  namePrefix: "primaryStep" | "followupStep";
+  index: number;
+  stepCount: number;
+  namePrefix: WorkflowStepPath;
   control: Control<CampaignFormValues>;
   register: UseFormRegister<CampaignFormValues>;
   previewContact: {
@@ -54,6 +55,7 @@ type StepEditorProps = {
   };
   setValue: UseFormSetValue<CampaignFormValues>;
   templates: WizardProps["templates"];
+  onRemove: () => void;
 };
 
 function getTemplateSnippet(template: {
@@ -67,22 +69,62 @@ function getTemplateSnippet(template: {
   return template.body_template.slice(0, 120) || productContent.shared.noBodyLabel;
 }
 
+function buildDefaultWorkflowStep(index: number): CampaignFormValues["workflowDefinition"]["steps"][number] {
+  const stepNumber = index + 1;
+  const isFinal = stepNumber >= 2;
+
+  return {
+    name: stepNumber === 1 ? "Primary email" : `Step ${stepNumber}`,
+    waitDays: stepNumber === 1 ? 2 : 0,
+    branchCondition: stepNumber === 1 ? "opened" : "time",
+    onMatch: isFinal ? "exit_sequence" : "next_step",
+    onNoMatch: stepNumber === 1 ? "next_step" : "exit_sequence",
+    subject: stepNumber === 1 ? "Quick idea for {{company}}" : "Following up on my note",
+    mode: "text",
+    body:
+      stepNumber === 1
+        ? "Hi {{first_name}},\n\nThought this might be relevant for {{company}}.\n\nBest,\nJay"
+        : "Hi {{first_name}},\n\nBumping this once in case it got buried.\n\nBest,\nJay",
+    bodyHtml: "",
+  };
+}
+
 function CampaignStepEditor({
-  title,
-  description,
+  index,
+  stepCount,
   namePrefix,
   control,
   register,
   previewContact,
   setValue,
   templates,
+  onRemove,
 }: StepEditorProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const stepCopy = productContent.campaigns.wizard.stepEditor;
-  const mode = useWatch({ control, name: `${namePrefix}.mode` as const });
-  const subject = useWatch({ control, name: `${namePrefix}.subject` as const });
-  const body = useWatch({ control, name: `${namePrefix}.body` as const });
-  const bodyHtml = useWatch({ control, name: `${namePrefix}.bodyHtml` as const });
+  const mode = useWatch({ control, name: `${namePrefix}.mode` as never }) as unknown as
+    | "text"
+    | "html"
+    | undefined;
+  const subject = useWatch({ control, name: `${namePrefix}.subject` as never }) as unknown as
+    | string
+    | undefined;
+  const body = useWatch({ control, name: `${namePrefix}.body` as never }) as unknown as
+    | string
+    | undefined;
+  const bodyHtml = useWatch({ control, name: `${namePrefix}.bodyHtml` as never }) as unknown as
+    | string
+    | undefined;
+  const stepName = useWatch({ control, name: `${namePrefix}.name` as never }) as unknown as
+    | string
+    | undefined;
+  const waitDays = useWatch({ control, name: `${namePrefix}.waitDays` as never }) as unknown as
+    | number
+    | undefined;
+  const branchCondition = useWatch({
+    control,
+    name: `${namePrefix}.branchCondition` as never,
+  }) as unknown as "time" | "opened" | "clicked" | undefined;
   const selectedTemplate = useMemo(
     () => templates.find((template) => template.id === selectedTemplateId) ?? null,
     [selectedTemplateId, templates],
@@ -103,27 +145,100 @@ function CampaignStepEditor({
     <Card>
       <CardHeader className="space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle>{title}</CardTitle>
-          <Badge variant="neutral">
-            {mode === "html" ? stepCopy.htmlModeLabel : stepCopy.textModeLabel}
-          </Badge>
+          <div className="space-y-1">
+            <CardTitle>{stepName || `Step ${index + 1}`}</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Step {index + 1} of {stepCount}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="neutral">
+              {mode === "html" ? stepCopy.htmlModeLabel : stepCopy.textModeLabel}
+            </Badge>
+            {stepCount > 1 ? (
+              <Button type="button" variant="outline" size="sm" onClick={onRemove}>
+                Remove step
+              </Button>
+            ) : null}
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)]">
-        <div className="grid gap-4">
+        <div className="grid gap-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-2 md:col-span-2">
+              <Label htmlFor={`${namePrefix}-name`}>Step name</Label>
+              <Input id={`${namePrefix}-name`} {...register(`${namePrefix}.name` as never)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor={`${namePrefix}-waitDays`}>Wait days</Label>
+              <Input
+                id={`${namePrefix}-waitDays`}
+                type="number"
+                min={0}
+                max={30}
+                {...register(`${namePrefix}.waitDays` as never)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor={`${namePrefix}-branchCondition`}>Branch on</Label>
+              <select
+                id={`${namePrefix}-branchCondition`}
+                className="glass-control h-12 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
+                {...register(`${namePrefix}.branchCondition` as never)}
+              >
+                <option value="time">Delay only</option>
+                <option value="opened">Opened email</option>
+                <option value="clicked">Clicked link</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="glass-control grid gap-4 rounded-[1.75rem] p-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor={`${namePrefix}-onMatch`}>
+                {branchCondition === "time" ? "After delay" : "If condition matches"}
+              </Label>
+              <select
+                id={`${namePrefix}-onMatch`}
+                className="glass-control h-12 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
+                {...register(`${namePrefix}.onMatch` as never)}
+              >
+                <option value="next_step">Advance to next step</option>
+                <option value="exit_sequence">Exit sequence</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor={`${namePrefix}-onNoMatch`}>
+                {branchCondition === "time" ? "Fallback" : "If condition does not match"}
+              </Label>
+              <select
+                id={`${namePrefix}-onNoMatch`}
+                className="glass-control h-12 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
+                {...register(`${namePrefix}.onNoMatch` as never)}
+                disabled={branchCondition === "time"}
+              >
+                <option value="next_step">Advance to next step</option>
+                <option value="exit_sequence">Exit sequence</option>
+              </select>
+            </div>
+            <div className="md:col-span-2 rounded-[1.4rem] border border-white/50 bg-white/52 px-4 py-3 text-sm text-muted-foreground">
+              {branchCondition === "time"
+                ? `After ${waitDays ?? 0} day(s), this step will either advance or exit based on the selected action.`
+                : `After ${waitDays ?? 0} day(s), this step checks whether the contact ${branchCondition === "opened" ? "opened the email" : "clicked a tracked link"} and routes the workflow from there.`}
+            </div>
+          </div>
+
           {templates.length ? (
             <div className="glass-control grid gap-3 rounded-[1.75rem] p-4">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor={`${namePrefix}-template`}>{stepCopy.savedTemplateLabel}</Label>
-                <span className="text-xs text-muted-foreground">
-                  {stepCopy.savedTemplateHint}
-                </span>
+                <span className="text-xs text-muted-foreground">{stepCopy.savedTemplateHint}</span>
               </div>
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
                 <select
                   id={`${namePrefix}-template`}
-                  className="glass-control h-12 flex-1 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
+                  className="glass-control h-12 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
                   value={selectedTemplateId}
                   onChange={(event) => {
                     const nextId = event.target.value;
@@ -135,19 +250,19 @@ function CampaignStepEditor({
                     }
 
                     const templateMode = nextTemplate.body_html_template ? "html" : "text";
-                    setValue(`${namePrefix}.mode` as const, templateMode, {
+                    setValue(`${namePrefix}.mode` as never, templateMode as never, {
                       shouldDirty: true,
                       shouldValidate: true,
                     });
-                    setValue(`${namePrefix}.subject` as const, nextTemplate.subject_template, {
+                    setValue(`${namePrefix}.subject` as never, nextTemplate.subject_template as never, {
                       shouldDirty: true,
                       shouldValidate: true,
                     });
-                    setValue(`${namePrefix}.body` as const, nextTemplate.body_template ?? "", {
+                    setValue(`${namePrefix}.body` as never, (nextTemplate.body_template ?? "") as never, {
                       shouldDirty: true,
                       shouldValidate: true,
                     });
-                    setValue(`${namePrefix}.bodyHtml` as const, nextTemplate.body_html_template ?? "", {
+                    setValue(`${namePrefix}.bodyHtml` as never, (nextTemplate.body_html_template ?? "") as never, {
                       shouldDirty: true,
                       shouldValidate: true,
                     });
@@ -182,11 +297,14 @@ function CampaignStepEditor({
               ) : null}
             </div>
           ) : null}
+
           <div className="grid gap-2">
             <Label>{stepCopy.composerModeLabel}</Label>
             <Tabs
               value={mode ?? "text"}
-              onValueChange={(value) => setValue(`${namePrefix}.mode` as const, value as "text" | "html", { shouldDirty: true })}
+              onValueChange={(value) =>
+                setValue(`${namePrefix}.mode` as never, value as never, { shouldDirty: true })
+              }
             >
               <TabsList>
                 <TabsTrigger value="text">{stepCopy.textModeLabel}</TabsTrigger>
@@ -194,10 +312,12 @@ function CampaignStepEditor({
               </TabsList>
             </Tabs>
           </div>
+
           <div className="grid gap-2">
             <Label htmlFor={`${namePrefix}-subject`}>{stepCopy.subjectLabel}</Label>
-            <Input id={`${namePrefix}-subject`} {...register(`${namePrefix}.subject` as const)} />
+            <Input id={`${namePrefix}-subject`} {...register(`${namePrefix}.subject` as never)} />
           </div>
+
           {mode === "html" ? (
             <>
               <div className="grid gap-2">
@@ -205,7 +325,7 @@ function CampaignStepEditor({
                 <Textarea
                   id={`${namePrefix}-html`}
                   className="min-h-60 font-mono text-xs"
-                  {...register(`${namePrefix}.bodyHtml` as const)}
+                  {...register(`${namePrefix}.bodyHtml` as never)}
                 />
               </div>
               <div className="grid gap-2">
@@ -221,8 +341,11 @@ function CampaignStepEditor({
                     }
 
                     void file.text().then((value) => {
-                      setValue(`${namePrefix}.mode` as const, "html", { shouldDirty: true });
-                      setValue(`${namePrefix}.bodyHtml` as const, value, { shouldDirty: true, shouldValidate: true });
+                      setValue(`${namePrefix}.mode` as never, "html" as never, { shouldDirty: true });
+                      setValue(`${namePrefix}.bodyHtml` as never, value as never, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
                     });
                   }}
                 />
@@ -233,14 +356,14 @@ function CampaignStepEditor({
                   id={`${namePrefix}-fallback`}
                   className="min-h-36"
                   placeholder={stepCopy.fallbackPlaceholder}
-                  {...register(`${namePrefix}.body` as const)}
+                  {...register(`${namePrefix}.body` as never)}
                 />
               </div>
             </>
           ) : (
             <div className="grid gap-2">
               <Label htmlFor={`${namePrefix}-body`}>{stepCopy.bodyLabel}</Label>
-              <Textarea id={`${namePrefix}-body`} className="min-h-60" {...register(`${namePrefix}.body` as const)} />
+              <Textarea id={`${namePrefix}-body`} className="min-h-60" {...register(`${namePrefix}.body` as never)} />
             </div>
           )}
         </div>
@@ -299,7 +422,7 @@ export function CampaignWizard({
   const [contactQuery, setContactQuery] = useState("");
   const [isPending, startTransition] = useTransition();
   const form = useForm<CampaignFormValues>({
-    resolver: zodResolver(campaignLaunchSchema),
+    resolver: zodResolver(campaignBuilderSchema),
     defaultValues:
       initialValues ?? {
         campaignName: "",
@@ -310,19 +433,14 @@ export function CampaignWizard({
         sendWindowStart: "09:00",
         sendWindowEnd: "17:00",
         dailySendLimit: 25,
-        primaryStep: {
-          subject: "Quick idea for {{company}}",
-          mode: "text",
-          body: "Hi {{first_name}},\n\nThought this might be relevant for {{company}}.\n\nBest,\nJay",
-          bodyHtml: "",
-        },
-        followupStep: {
-          subject: "Following up on my note",
-          mode: "text",
-          body: "Hi {{first_name}},\n\nBumping this once in case it got buried.\n\nBest,\nJay",
-          bodyHtml: "",
+        workflowDefinition: {
+          steps: [buildDefaultWorkflowStep(0), buildDefaultWorkflowStep(1)],
         },
       },
+  });
+  const stepFields = useFieldArray({
+    control: form.control,
+    name: "workflowDefinition.steps",
   });
   const watchedTargetContactIds = useWatch({
     control: form.control,
@@ -358,7 +476,11 @@ export function CampaignWizard({
       company: selectedContact?.company ?? "Northstar",
       website: selectedContact?.website ?? "northstar.dev",
       job_title: selectedContact?.job_title ?? "Founder",
-      custom: (selectedContact?.custom_fields_jsonb as Record<string, string | number | boolean | null | undefined> | null | undefined) ?? null,
+      custom:
+        (selectedContact?.custom_fields_jsonb as
+          | Record<string, string | number | boolean | null | undefined>
+          | null
+          | undefined) ?? null,
     };
   }, [availableContacts, targetContactIds]);
 
@@ -450,7 +572,7 @@ export function CampaignWizard({
             void submitCampaign(false);
           }}
         >
-          <section className="grid gap-4 md:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-4">
             <div className="glass-control rounded-[1.75rem] p-5">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 {wizardCopy.summary.audience.eyebrow}
@@ -458,6 +580,15 @@ export function CampaignWizard({
               <p className="mt-3 text-3xl font-semibold text-foreground">{targetContactIds.length}</p>
               <p className="mt-2 text-sm text-muted-foreground">
                 {wizardCopy.summary.audience.description}
+              </p>
+            </div>
+            <div className="glass-control rounded-[1.75rem] p-5">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                Workflow steps
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-foreground">{stepFields.fields.length}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                structured email steps with send timing and branching rules
               </p>
             </div>
             <div className="glass-control rounded-[1.75rem] p-5">
@@ -492,9 +623,7 @@ export function CampaignWizard({
                 className="glass-control h-12 appearance-none rounded-[1.15rem] border-0 px-4 text-sm shadow-none"
                 {...form.register("gmailAccountId")}
               >
-                {!hasMailbox ? (
-                  <option value="">{wizardCopy.senderEmptyLabel}</option>
-                ) : null}
+                {!hasMailbox ? <option value="">{wizardCopy.senderEmptyLabel}</option> : null}
                 {gmailAccounts.map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.email_address}
@@ -617,7 +746,6 @@ export function CampaignWizard({
               asForm={false}
             />
           </section>
-
           <section className="grid gap-4 md:grid-cols-4">
             <div className="grid gap-2">
               <Label htmlFor="timezone">{wizardCopy.schedule.timezoneLabel}</Label>
@@ -637,30 +765,48 @@ export function CampaignWizard({
             </div>
           </section>
 
-          <CampaignStepEditor
-            title={wizardCopy.primaryStep.title}
-            description={wizardCopy.primaryStep.description}
-            namePrefix="primaryStep"
-            control={form.control}
-            register={form.register}
-            previewContact={previewContact}
-            setValue={form.setValue}
-            templates={templates}
-          />
-          <CampaignStepEditor
-            title={wizardCopy.followupStep.title}
-            description={wizardCopy.followupStep.description}
-            namePrefix="followupStep"
-            control={form.control}
-            register={form.register}
-            previewContact={previewContact}
-            setValue={form.setValue}
-            templates={templates}
-          />
+          <section className="grid gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Workflow builder</h2>
+                <p className="text-sm text-muted-foreground">
+                  Build a structured sequence with wait timing, tracked branching, and HTML-ready templates.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={stepFields.fields.length >= 5}
+                onClick={() => stepFields.append(buildDefaultWorkflowStep(stepFields.fields.length))}
+              >
+                Add step
+              </Button>
+            </div>
+
+            {stepFields.fields.map((field, index) => (
+              <CampaignStepEditor
+                key={field.id}
+                index={index}
+                stepCount={stepFields.fields.length}
+                namePrefix={`workflowDefinition.steps.${index}`}
+                control={form.control}
+                register={form.register}
+                previewContact={previewContact}
+                setValue={form.setValue}
+                templates={templates}
+                onRemove={() => stepFields.remove(index)}
+              />
+            ))}
+          </section>
 
           <div className="flex flex-wrap justify-end gap-3">
             {mode === "create" ? (
-              <Button type="button" variant="outline" disabled={isPending || !hasMailbox} onClick={() => void submitCampaign(true)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending || !hasMailbox}
+                onClick={() => void submitCampaign(true)}
+              >
                 {isPending ? wizardCopy.actions.pendingCreate : wizardCopy.actions.launchNow}
               </Button>
             ) : null}

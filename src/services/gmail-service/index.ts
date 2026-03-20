@@ -2,13 +2,17 @@ import "server-only";
 import { google } from "googleapis";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { decryptToken, encryptToken } from "@/lib/crypto/tokens";
+import { classifyReplyDisposition } from "@/lib/utils/reply-disposition";
+import { isAnyMissingColumnResult, isMissingColumnError, isMissingColumnResult } from "@/lib/utils/supabase-schema";
 import {
   env,
   isGoogleConfigured,
   requireGoogleConfiguration,
   requireSupabaseConfiguration,
 } from "@/lib/supabase/env";
+import { assertWorkspaceCanConnectMailbox, refreshWorkspaceUsageCounters } from "@/services/entitlement-service";
 import { getMailboxProvider } from "@/services/mailbox-providers";
+import { recordMessageEvent } from "@/services/telemetry-service";
 
 const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
@@ -34,6 +38,39 @@ function createOAuthClientWithRedirectUri(redirectUri?: string) {
     env.GOOGLE_CLIENT_SECRET,
     redirectUri ?? env.GOOGLE_OAUTH_REDIRECT_URI,
   );
+}
+
+async function updateCampaignContactReplyState(
+  campaignContactId: string,
+  values: Record<string, unknown>,
+) {
+  const supabase = createAdminSupabaseClient();
+  let result = await supabase
+    .from("campaign_contacts")
+    .update(values)
+    .eq("id", campaignContactId);
+
+  if (
+    isAnyMissingColumnResult(result, [
+      { table: "campaign_contacts", column: "reply_disposition" },
+      { table: "campaign_contacts", column: "meeting_booked_at" },
+      { table: "campaign_contacts", column: "exit_reason" },
+    ])
+  ) {
+    const fallbackValues = { ...values };
+    delete fallbackValues.reply_disposition;
+    delete fallbackValues.meeting_booked_at;
+    delete fallbackValues.exit_reason;
+
+    result = await supabase
+      .from("campaign_contacts")
+      .update(fallbackValues)
+      .eq("id", campaignContactId);
+  }
+
+  if (result.error) {
+    throw result.error;
+  }
 }
 
 export function createGoogleConnectUrl(state: string, options?: { redirectUri?: string }) {
@@ -109,7 +146,7 @@ export async function storeGmailConnection(input: {
   }
   const oauthConnection = rawOauthConnection as { id: string };
 
-  const { data: rawGmailAccount, error: gmailError } = await supabase
+  let gmailAccountResult = await supabase
     .from("gmail_accounts")
     .upsert(
       {
@@ -119,29 +156,80 @@ export async function storeGmailConnection(input: {
         email_address: input.emailAddress,
         health_status: "active",
         status: "active",
+        approval_status: "pending",
+        approved_by_user_id: null,
+        approved_at: null,
+        approval_note: "Awaiting workspace approval",
         daily_send_count: 0,
       },
       { onConflict: "workspace_id,email_address" },
     )
-    .select("id, email_address")
+    .select("id, email_address, approval_status")
     .single();
+
+  if (isMissingColumnResult(gmailAccountResult, "gmail_accounts", "approval_status")) {
+    gmailAccountResult = await supabase
+      .from("gmail_accounts")
+      .upsert(
+        {
+          workspace_id: input.workspaceId,
+          user_id: input.userId,
+          oauth_connection_id: oauthConnection.id,
+          email_address: input.emailAddress,
+          health_status: "active",
+          status: "active",
+          daily_send_count: 0,
+        },
+        { onConflict: "workspace_id,email_address" },
+      )
+      .select("id, email_address")
+      .single();
+  }
+
+  const { data: rawGmailAccount, error: gmailError } = gmailAccountResult;
 
   if (gmailError) {
     throw gmailError;
   }
 
-  return rawGmailAccount as { id: string; email_address: string };
+  await refreshWorkspaceUsageCounters(input.workspaceId);
+
+  return rawGmailAccount as { id: string; email_address: string; approval_status?: string | null };
 }
 
-export async function getWorkspaceGmailAccounts(workspaceId: string) {
+export async function getWorkspaceGmailAccounts(
+  workspaceId: string,
+  options?: { onlyApproved?: boolean },
+) {
   requireSupabaseConfiguration();
 
   const supabase = createAdminSupabaseClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("gmail_accounts")
-    .select("id, email_address, status, health_status, last_synced_at")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
+    .select("id, email_address, status, health_status, approval_status, approved_at, approval_note, user_id, last_synced_at")
+    .eq("workspace_id", workspaceId);
+
+  if (options?.onlyApproved) {
+    query = query.eq("approval_status", "approved");
+  }
+
+  let result = await query.order("created_at", { ascending: false });
+
+  if (
+    isAnyMissingColumnResult(result, [
+      { table: "gmail_accounts", column: "approval_status" },
+      { table: "gmail_accounts", column: "approved_at" },
+      { table: "gmail_accounts", column: "approval_note" },
+    ])
+  ) {
+    result = await supabase
+      .from("gmail_accounts")
+      .select("id, email_address, status, health_status, user_id, last_synced_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false });
+  }
+
+  const { data, error } = result;
 
   if (error) {
     throw error;
@@ -151,9 +239,47 @@ export async function getWorkspaceGmailAccounts(workspaceId: string) {
     id: string;
     email_address: string;
     status: string;
+    approval_status?: string | null;
+    approved_at?: string | null;
+    approval_note?: string | null;
+    user_id?: string | null;
     health_status?: string | null;
     last_synced_at?: string | null;
   }>;
+}
+
+export async function approveGmailAccount(input: {
+  workspaceId: string;
+  gmailAccountId: string;
+  actorUserId: string;
+  approvalStatus: "approved" | "rejected";
+  approvalNote?: string | null;
+}) {
+  requireSupabaseConfiguration();
+  await assertWorkspaceCanConnectMailbox(input.workspaceId);
+
+  const supabase = createAdminSupabaseClient();
+  const { error } = await supabase
+    .from("gmail_accounts")
+    .update({
+      approval_status: input.approvalStatus,
+      approved_by_user_id: input.actorUserId,
+      approved_at: new Date().toISOString(),
+      approval_note: input.approvalNote?.trim() || null,
+    })
+    .eq("workspace_id", input.workspaceId)
+    .eq("id", input.gmailAccountId);
+
+  if (error && !isMissingColumnError(error.message, "gmail_accounts", "approval_status")) {
+    throw error;
+  }
+
+  await refreshWorkspaceUsageCounters(input.workspaceId);
+
+  return {
+    gmailAccountId: input.gmailAccountId,
+    approvalStatus: input.approvalStatus,
+  };
 }
 
 export async function refreshMailboxToken(connectionId: string) {
@@ -217,6 +343,8 @@ export async function disconnectMailbox(workspaceId: string, gmailAccountId: str
     })
     .eq("workspace_id", workspaceId)
     .eq("id", gmailAccountId);
+
+  await refreshWorkspaceUsageCounters(workspaceId);
 }
 
 export async function sendWithMailboxProvider(input: {
@@ -236,17 +364,29 @@ export async function getMailboxAccessTokenForAccount(gmailAccountId: string) {
   requireGoogleConfiguration();
 
   const supabase = createAdminSupabaseClient();
-  const { data: rawMailbox, error } = await supabase
+  let mailboxResult = await supabase
     .from("gmail_accounts")
     .select(
-      "id, email_address, oauth_connection:oauth_connections(id, access_token_encrypted, refresh_token_encrypted, token_expiry)",
+      "id, email_address, approval_status, oauth_connection:oauth_connections(id, access_token_encrypted, refresh_token_encrypted, token_expiry)",
     )
     .eq("id", gmailAccountId)
     .single();
-  const data = rawMailbox as
+
+  if (isMissingColumnResult(mailboxResult, "gmail_accounts", "approval_status")) {
+    mailboxResult = await supabase
+      .from("gmail_accounts")
+      .select(
+        "id, email_address, oauth_connection:oauth_connections(id, access_token_encrypted, refresh_token_encrypted, token_expiry)",
+      )
+      .eq("id", gmailAccountId)
+      .single();
+  }
+
+  const data = mailboxResult.data as
     | {
         id: string;
         email_address: string;
+        approval_status?: string | null;
         oauth_connection?: {
           id: string;
           access_token_encrypted: string | null;
@@ -256,8 +396,12 @@ export async function getMailboxAccessTokenForAccount(gmailAccountId: string) {
       }
     | null;
 
-  if (error || !data?.oauth_connection) {
-    throw error ?? new Error("Mailbox connection not found.");
+  if (mailboxResult.error || !data?.oauth_connection) {
+    throw mailboxResult.error ?? new Error("Mailbox connection not found.");
+  }
+
+  if (typeof data.approval_status !== "undefined" && data.approval_status !== "approved") {
+    throw new Error("Mailbox is pending workspace approval.");
   }
 
   const oauthConnection = data.oauth_connection as {
@@ -489,15 +633,53 @@ export async function syncWorkspaceReplies(workspaceId: string) {
           });
 
           if (message.direction === "inbound" && threadRecord.campaign_contact_id) {
-            inboundMessages += 1;
-            await supabase
+            const disposition = classifyReplyDisposition(
+              [message.subject ?? "", message.bodyText ?? "", message.snippet ?? ""].filter(Boolean).join("\n"),
+            );
+            const { data: rawCampaignContact } = await supabase
               .from("campaign_contacts")
-              .update({
-                status: "replied",
-                replied_at: message.sentAt,
-                next_due_at: null,
-              })
-              .eq("id", threadRecord.campaign_contact_id);
+              .select("contact_id")
+              .eq("id", threadRecord.campaign_contact_id)
+              .maybeSingle();
+            const campaignContact = rawCampaignContact as { contact_id?: string | null } | null;
+            inboundMessages += 1;
+            await updateCampaignContactReplyState(threadRecord.campaign_contact_id, {
+              status:
+                disposition === "negative"
+                  ? "unsubscribed"
+                  : disposition === "booked"
+                    ? "meeting_booked"
+                    : "replied",
+              replied_at: message.sentAt,
+              reply_disposition: disposition,
+              meeting_booked_at: disposition === "booked" ? message.sentAt : null,
+              exit_reason: disposition === "negative" ? "negative_reply" : disposition === "booked" ? "meeting_booked" : "reply_received",
+              next_due_at: null,
+            });
+
+            if (disposition === "negative") {
+              await supabase
+                .from("contacts")
+                .update({ unsubscribed_at: message.sentAt })
+                .eq("id", campaignContact?.contact_id ?? "");
+            }
+
+            await recordMessageEvent({
+              workspaceId,
+              campaignContactId: threadRecord.campaign_contact_id,
+              gmailMessageId: message.gmailMessageId,
+              eventType:
+                disposition === "negative"
+                  ? "unsubscribed"
+                  : disposition === "booked"
+                    ? "meeting_booked"
+                    : "replied",
+              metadata: {
+                disposition,
+                fromEmail: message.fromEmail,
+                subject: message.subject,
+              },
+            });
           }
         }
 

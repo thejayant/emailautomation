@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, LogOut, Sparkles } from "lucide-react";
 import { GmailMark } from "@/components/icons/gmail-mark";
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { productContent } from "@/content/product";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Button } from "@/components/ui/button";
@@ -8,9 +9,18 @@ import { Button } from "@/components/ui/button";
 export function AppShell({
   children,
   brandSubtitle = productContent.shell.brand.subtitle,
+  activeWorkspaceId,
+  workspaces,
 }: {
   children: React.ReactNode;
   brandSubtitle?: string;
+  activeWorkspaceId: string;
+  workspaces: Array<{
+    id: string;
+    name: string;
+    kind: "personal" | "shared";
+    role: "owner" | "admin" | "member";
+  }>;
 }) {
   return (
     <div className="page-gradient min-h-screen px-3 py-3 sm:px-4 sm:py-4">
@@ -36,6 +46,10 @@ export function AppShell({
           </div>
 
           <div className="mt-4">
+            <WorkspaceSwitcher activeWorkspaceId={activeWorkspaceId} workspaces={workspaces} />
+          </div>
+
+          <div className="mt-4">
             <SidebarNav orientation="horizontal" />
           </div>
         </div>
@@ -57,6 +71,9 @@ export function AppShell({
             </div>
 
             <div className="sidebar-nav-region scrollbar-none min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="mb-5">
+                <WorkspaceSwitcher activeWorkspaceId={activeWorkspaceId} workspaces={workspaces} />
+              </div>
               <SidebarNav />
             </div>
 
