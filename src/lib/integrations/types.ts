@@ -2,6 +2,7 @@ export type IntegrationCategory =
   | "crm_sync"
   | "automation_alerts"
   | "deliverability"
+  | "mailboxes"
   | "meetings";
 
 export type WorkspaceIntegrationProvider = "slack" | "webhook" | "hunter" | "calendly";

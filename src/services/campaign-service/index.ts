@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "crypto";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { env, requireSupabaseConfiguration } from "@/lib/supabase/env";
 import { escapeHtml, normalizeEmailHtmlDocument, stripHtmlToText } from "@/lib/utils/html";
-import { isAnyMissingColumnResult } from "@/lib/utils/supabase-schema";
+import { isAnyMissingColumnResult, isMissingTableResult } from "@/lib/utils/supabase-schema";
 import { renderTemplate } from "@/lib/utils/template";
 import {
   buildWorkflowDefinitionFromStoredSteps,
@@ -199,6 +199,55 @@ function normalizeStepInput(step: CampaignStepInput) {
   };
 }
 
+async function resolveCampaignMailboxAssignment(input: {
+  mailboxAccountId: string;
+  projectId: string;
+  workspaceId: string;
+}) {
+  const supabase = createAdminSupabaseClient();
+  const mailboxResult = await supabase
+    .from("mailbox_accounts")
+    .select("id, provider")
+    .eq("workspace_id", input.workspaceId)
+    .eq("project_id", input.projectId)
+    .eq("id", input.mailboxAccountId)
+    .maybeSingle();
+
+  if (mailboxResult.error && !isMissingTableResult(mailboxResult, "mailbox_accounts")) {
+    throw mailboxResult.error;
+  }
+
+  if (mailboxResult.data) {
+    const provider = (mailboxResult.data as { provider?: string | null }).provider;
+
+    return {
+      gmailAccountId: provider === "gmail" ? input.mailboxAccountId : null,
+      mailboxAccountId: input.mailboxAccountId,
+    };
+  }
+
+  const gmailResult = await supabase
+    .from("gmail_accounts")
+    .select("id")
+    .eq("workspace_id", input.workspaceId)
+    .eq("project_id", input.projectId)
+    .eq("id", input.mailboxAccountId)
+    .maybeSingle();
+
+  if (gmailResult.error) {
+    throw gmailResult.error;
+  }
+
+  if (!gmailResult.data) {
+    throw new Error("Mailbox not found for this project.");
+  }
+
+  return {
+    gmailAccountId: input.mailboxAccountId,
+    mailboxAccountId: input.mailboxAccountId,
+  };
+}
+
 function appendUnsubscribeHtml(htmlBody: string, unsubscribeLink: string) {
   const normalized = normalizeEmailHtmlDocument(htmlBody);
   const unsubscribeBlock = `<div style="margin-top:24px;font-size:13px;color:#64748b;"><a href="${unsubscribeLink}">Unsubscribe</a></div>`;
@@ -339,7 +388,7 @@ async function selectCampaignWithSteps(campaignId: string) {
   let result = await supabase
     .from("campaigns")
     .select(
-      "id, workspace_id, project_id, name, status, daily_send_limit, timezone, send_window_start, send_window_end, gmail_account_id, workflow_definition_jsonb, campaign_steps(id, step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(id, status, current_step, next_due_at, contact_id, contact:contacts(email, first_name, company))",
+      "id, workspace_id, project_id, name, status, daily_send_limit, timezone, send_window_start, send_window_end, mailbox_account_id, gmail_account_id, workflow_definition_jsonb, campaign_steps(id, step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(id, status, current_step, next_due_at, contact_id, contact:contacts(email, first_name, company))",
     )
     .eq("id", campaignId)
     .single();
@@ -366,7 +415,7 @@ async function selectCampaignForEditing(campaignId: string, workspaceId: string,
   let result = await supabase
     .from("campaigns")
     .select(
-      "id, workspace_id, project_id, name, status, gmail_account_id, daily_send_limit, timezone, send_window_start, send_window_end, workflow_definition_jsonb, campaign_steps(step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(contact_id, status, current_step)",
+      "id, workspace_id, project_id, name, status, mailbox_account_id, gmail_account_id, daily_send_limit, timezone, send_window_start, send_window_end, workflow_definition_jsonb, campaign_steps(step_number, step_type, subject_template, body_template, body_html_template, wait_days), campaign_contacts(contact_id, status, current_step)",
     )
     .eq("id", campaignId)
     .eq("workspace_id", workspaceId)
@@ -535,6 +584,7 @@ export async function getCampaignById(campaignId: string, workspaceId?: string, 
     status: string;
     daily_send_limit: number;
     timezone: string;
+    mailbox_account_id?: string | null;
     gmail_account_id: string;
     workflow_definition_jsonb?: Partial<CampaignWorkflowDefinition> | null;
     send_window_start?: string | null;
@@ -561,6 +611,7 @@ export async function getCampaignForEditing(campaignId: string, workspaceId: str
     project_id: string;
     name: string;
     status: string;
+    mailbox_account_id?: string | null;
     gmail_account_id: string;
     daily_send_limit: number;
     timezone: string;
@@ -587,6 +638,7 @@ type DueCampaignContact = {
   failed_attempts: number;
   next_due_at: string | null;
   last_thread_id?: string | null;
+  last_message_id?: string | null;
   contact?: CampaignContactContext | null;
   campaign?: {
     id: string;
@@ -594,7 +646,8 @@ type DueCampaignContact = {
     project_id: string;
     name: string;
     status: string;
-    gmail_account_id: string;
+    mailbox_account_id?: string | null;
+    gmail_account_id?: string | null;
     workflow_definition_jsonb?: Partial<CampaignWorkflowDefinition> | null;
     daily_send_limit: number;
     send_window_start: string;
@@ -704,7 +757,8 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
   }
 
   try {
-    const mailbox = await getMailboxAccessTokenForAccount(campaign.gmail_account_id);
+    const mailboxAccountId = campaign.mailbox_account_id ?? campaign.gmail_account_id ?? "";
+    const mailbox = await getMailboxAccessTokenForAccount(mailboxAccountId);
     const unsubscribeToken = randomUUID();
     const rendered = renderCampaignStepContent(step, contact, buildUnsubscribeLink(unsubscribeToken));
     const trackedHtml = await instrumentHtmlForTracking({
@@ -714,6 +768,7 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
       html: rendered.bodyHtml,
     });
     const sendResult = await sendWithMailboxProvider({
+      provider: mailbox.provider,
       accessToken: mailbox.accessToken,
       fromEmail: mailbox.emailAddress,
       toEmail: contact.email,
@@ -721,6 +776,7 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
       bodyHtml: trackedHtml,
       bodyText: rendered.bodyText,
       replyThreadId: item.current_step > 1 ? item.last_thread_id : null,
+      replyMessageId: item.current_step > 1 ? item.last_message_id ?? null : null,
     });
 
     const sentAt = new Date().toISOString();
@@ -730,6 +786,8 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
       campaign_contact_id: item.id,
       gmail_message_id: sendResult.messageId ?? null,
       gmail_thread_id: sendResult.threadId ?? null,
+      provider_message_id: sendResult.messageId ?? null,
+      provider_thread_id: sendResult.threadId ?? null,
       step_number: item.current_step,
       sent_at: sentAt,
       status: "sent",
@@ -743,6 +801,8 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
       workspace_id: campaign.workspace_id,
       project_id: campaign.project_id,
       campaign_contact_id: item.id,
+      mailbox_account_id: mailbox.mailboxAccountId,
+      provider_thread_id: sendResult.threadId || sendResult.messageId || randomUUID(),
       gmail_thread_id: sendResult.threadId || sendResult.messageId || randomUUID(),
       subject: rendered.subject,
       snippet: rendered.snippet,
@@ -771,6 +831,7 @@ async function processCampaignContact(item: DueCampaignContact, options?: { igno
       campaignContactId: item.id,
       outboundMessageId: (outboundMessage as { id?: string } | null)?.id ?? null,
       gmailMessageId: sendResult.messageId ?? null,
+      providerMessageId: sendResult.messageId ?? null,
       eventType: "sent",
       metadata: {
         stepNumber: item.current_step,
@@ -799,7 +860,7 @@ export async function createCampaign(input: {
   projectId: string;
   userId: string;
   campaignName: string;
-  gmailAccountId: string;
+  mailboxAccountId: string;
   targetContactIds: string[];
   timezone: string;
   sendWindowStart: string;
@@ -814,6 +875,11 @@ export async function createCampaign(input: {
     targetContactIds: input.targetContactIds,
   });
   const workflowDefinition = normalizeWorkflowDefinition(input.workflowDefinition);
+  const mailboxAssignment = await resolveCampaignMailboxAssignment({
+    mailboxAccountId: input.mailboxAccountId,
+    projectId: input.projectId,
+    workspaceId: input.workspaceId,
+  });
 
   const supabase = createAdminSupabaseClient();
   let createResult = await supabase
@@ -824,7 +890,8 @@ export async function createCampaign(input: {
       owner_user_id: input.userId,
       name: input.campaignName,
       status: "active",
-      gmail_account_id: input.gmailAccountId,
+      mailbox_account_id: mailboxAssignment.mailboxAccountId,
+      gmail_account_id: mailboxAssignment.gmailAccountId,
       daily_send_limit: input.dailySendLimit,
       send_window_start: input.sendWindowStart,
       send_window_end: input.sendWindowEnd,
@@ -836,6 +903,12 @@ export async function createCampaign(input: {
     .single();
 
   if (isCampaignSchemaResult(createResult)) {
+    if (mailboxAssignment.gmailAccountId !== mailboxAssignment.mailboxAccountId) {
+      throw new Error(
+        "Outlook senders require the latest mailbox-account migration. Apply the current Supabase migrations and retry.",
+      );
+    }
+
     createResult = await supabase
       .from("campaigns")
       .insert({
@@ -844,7 +917,7 @@ export async function createCampaign(input: {
         owner_user_id: input.userId,
         name: input.campaignName,
         status: "active",
-        gmail_account_id: input.gmailAccountId,
+        gmail_account_id: mailboxAssignment.gmailAccountId,
         daily_send_limit: input.dailySendLimit,
         send_window_start: input.sendWindowStart,
         send_window_end: input.sendWindowEnd,
@@ -891,7 +964,7 @@ export async function updateCampaign(input: {
   projectId: string;
   campaignId: string;
   campaignName: string;
-  gmailAccountId: string;
+  mailboxAccountId: string;
   targetContactIds: string[];
   timezone: string;
   sendWindowStart: string;
@@ -905,6 +978,11 @@ export async function updateCampaign(input: {
     targetContactIds: input.targetContactIds,
   });
   const workflowDefinition = normalizeWorkflowDefinition(input.workflowDefinition);
+  const mailboxAssignment = await resolveCampaignMailboxAssignment({
+    mailboxAccountId: input.mailboxAccountId,
+    projectId: input.projectId,
+    workspaceId: input.workspaceId,
+  });
 
   const supabase = createAdminSupabaseClient();
   const { data: campaign, error: campaignError } = await supabase
@@ -927,7 +1005,8 @@ export async function updateCampaign(input: {
     .from("campaigns")
     .update({
       name: input.campaignName,
-      gmail_account_id: input.gmailAccountId,
+      mailbox_account_id: mailboxAssignment.mailboxAccountId,
+      gmail_account_id: mailboxAssignment.gmailAccountId,
       daily_send_limit: input.dailySendLimit,
       send_window_start: input.sendWindowStart,
       send_window_end: input.sendWindowEnd,
@@ -943,11 +1022,17 @@ export async function updateCampaign(input: {
   }
 
   if (updateError && isCampaignSchemaCacheError(updateError)) {
+    if (mailboxAssignment.gmailAccountId !== mailboxAssignment.mailboxAccountId) {
+      throw new Error(
+        "Outlook senders require the latest mailbox-account migration. Apply the current Supabase migrations and retry.",
+      );
+    }
+
     const { error: fallbackUpdateError } = await supabase
       .from("campaigns")
       .update({
         name: input.campaignName,
-        gmail_account_id: input.gmailAccountId,
+        gmail_account_id: mailboxAssignment.gmailAccountId,
         daily_send_limit: input.dailySendLimit,
         send_window_start: input.sendWindowStart,
         send_window_end: input.sendWindowEnd,

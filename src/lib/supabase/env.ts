@@ -22,6 +22,10 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REDIRECT_URI: z.string().optional(),
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  MICROSOFT_OAUTH_REDIRECT_URI: z.string().optional(),
+  MICROSOFT_TENANT_ID: z.string().optional(),
   HUBSPOT_CLIENT_ID: z.string().optional(),
   HUBSPOT_CLIENT_SECRET: z.string().optional(),
   HUBSPOT_OAUTH_REDIRECT_URI: z.string().optional(),
@@ -69,6 +73,10 @@ const rawEnv = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_OAUTH_REDIRECT_URI: process.env.GOOGLE_OAUTH_REDIRECT_URI,
+  MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
+  MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
+  MICROSOFT_OAUTH_REDIRECT_URI: process.env.MICROSOFT_OAUTH_REDIRECT_URI,
+  MICROSOFT_TENANT_ID: process.env.MICROSOFT_TENANT_ID,
   HUBSPOT_CLIENT_ID: process.env.HUBSPOT_CLIENT_ID,
   HUBSPOT_CLIENT_SECRET: process.env.HUBSPOT_CLIENT_SECRET,
   HUBSPOT_OAUTH_REDIRECT_URI: process.env.HUBSPOT_OAUTH_REDIRECT_URI,
@@ -140,6 +148,12 @@ export const isGoogleConfigured = Boolean(
     env.TOKEN_ENCRYPTION_KEY,
 );
 
+export const isMicrosoftConfigured = Boolean(
+  env.MICROSOFT_CLIENT_ID &&
+    env.MICROSOFT_CLIENT_SECRET &&
+    env.TOKEN_ENCRYPTION_KEY,
+);
+
 export const isHubSpotConfigured = Boolean(
   env.HUBSPOT_CLIENT_ID &&
     env.HUBSPOT_CLIENT_SECRET &&
@@ -190,6 +204,14 @@ export function requireGoogleConfiguration() {
   if (!isGoogleConfigured) {
     throw new Error(
       "Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and TOKEN_ENCRYPTION_KEY.",
+    );
+  }
+}
+
+export function requireMicrosoftConfiguration() {
+  if (!isMicrosoftConfigured) {
+    throw new Error(
+      "Microsoft OAuth is not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and TOKEN_ENCRYPTION_KEY.",
     );
   }
 }

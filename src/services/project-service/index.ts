@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { env, requireSupabaseConfiguration } from "@/lib/supabase/env";
+import { isMissingTableResult } from "@/lib/utils/supabase-schema";
 import {
   buildProjectSlug,
   type ProjectMailboxRegistryItem,
@@ -370,30 +371,69 @@ export async function updateProject(input: {
 export async function listWorkspaceProjectMailboxRegistry(workspaceId: string) {
   requireSupabaseConfiguration();
   const supabase = createAdminSupabaseClient();
-  const [projects, rawAccounts] = await Promise.all([
+  const [projects, rawMailboxAccounts] = await Promise.all([
     listWorkspaceProjects(workspaceId),
     supabase
-      .from("gmail_accounts")
-      .select("id, project_id, email_address, status, approval_status, approval_note")
+      .from("mailbox_accounts")
+      .select("id, project_id, provider, email_address, provider_account_label, status, approval_status, approval_note")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
   ]);
 
-  if (rawAccounts.error) {
-    throw toProjectServiceError("loading the project mailbox registry", rawAccounts.error);
-  }
-
-  const accounts = (rawAccounts.data ?? []) as Array<{
+  let accounts = [] as Array<{
     id: string;
     project_id: string;
+    provider: "gmail" | "outlook";
     email_address: string;
+    provider_account_label?: string | null;
     status: string;
     approval_status?: string | null;
     approval_note?: string | null;
   }>;
 
+  if (rawMailboxAccounts.error) {
+    if (!isMissingTableResult(rawMailboxAccounts, "mailbox_accounts")) {
+      throw toProjectServiceError("loading the project mailbox registry", rawMailboxAccounts.error);
+    }
+
+    const rawGmailAccounts = await supabase
+      .from("gmail_accounts")
+      .select("id, project_id, email_address, status, approval_status, approval_note")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false });
+
+    if (rawGmailAccounts.error) {
+      throw toProjectServiceError("loading the project mailbox registry", rawGmailAccounts.error);
+    }
+
+    accounts = ((rawGmailAccounts.data ?? []) as Array<{
+      id: string;
+      project_id: string;
+      email_address: string;
+      status: string;
+      approval_status?: string | null;
+      approval_note?: string | null;
+    }>).map((account) => ({
+      ...account,
+      provider: "gmail" as const,
+      provider_account_label: account.email_address,
+    }));
+  } else {
+    accounts = (rawMailboxAccounts.data ?? []) as Array<{
+      id: string;
+      project_id: string;
+      provider: "gmail" | "outlook";
+      email_address: string;
+      provider_account_label?: string | null;
+      status: string;
+      approval_status?: string | null;
+      approval_note?: string | null;
+    }>;
+  }
+
   return projects.map((project) => ({
     ...project,
+    mailboxAccounts: accounts.filter((account) => account.project_id === project.id),
     gmailAccounts: accounts.filter((account) => account.project_id === project.id),
   })) satisfies ProjectMailboxRegistryItem[];
 }

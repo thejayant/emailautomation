@@ -6,7 +6,7 @@ import { getWorkspaceContext } from "@/lib/db/workspace";
 import type { TemplateListItem } from "@/lib/templates/gallery";
 import { buildWorkflowDefinitionFromStoredSteps, normalizeWorkflowDefinition } from "@/lib/workflows/definition";
 import { getCampaignForEditing } from "@/services/campaign-service";
-import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
+import { getWorkspaceMailboxAccounts } from "@/services/mailbox-service";
 
 export default async function EditCampaignPage({
   params,
@@ -15,16 +15,20 @@ export default async function EditCampaignPage({
 }) {
   const { campaignId } = await params;
   const workspace = await getWorkspaceContext();
-  const [campaign, rawGmailAccounts, contacts, rawTemplates] = await Promise.all([
+  const [campaign, rawMailboxAccounts, contacts, rawTemplates] = await Promise.all([
     getCampaignForEditing(campaignId, workspace.workspaceId, workspace.activeProjectId),
-    getWorkspaceGmailAccounts(workspace.workspaceId, {
+    getWorkspaceMailboxAccounts(workspace.workspaceId, {
       onlyApproved: true,
       projectId: workspace.activeProjectId,
     }),
     getCachedContacts(workspace.userId, workspace.workspaceId, workspace.activeProjectId),
     getCachedTemplates(workspace.userId, workspace.workspaceId, workspace.activeProjectId),
   ]);
-  const gmailAccounts = rawGmailAccounts as Array<{ id: string; email_address: string }>;
+  const mailboxAccounts = rawMailboxAccounts as Array<{
+    id: string;
+    email_address: string;
+    provider: "gmail" | "outlook";
+  }>;
   const templates = rawTemplates as TemplateListItem[];
   const workflowDefinition = normalizeWorkflowDefinition(campaign.workflow_definition_jsonb);
   const fallbackWorkflow = buildWorkflowDefinitionFromStoredSteps(campaign.campaign_steps ?? []);
@@ -40,12 +44,12 @@ export default async function EditCampaignPage({
       <CampaignWizard
         mode="edit"
         campaignId={campaignId}
-        gmailAccounts={gmailAccounts}
+        mailboxAccounts={mailboxAccounts}
         contacts={contacts}
         templates={templates}
         initialValues={{
           campaignName: campaign.name,
-          gmailAccountId: campaign.gmail_account_id,
+          mailboxAccountId: campaign.mailbox_account_id ?? campaign.gmail_account_id,
           contactListId: "",
           targetContactIds: (campaign.campaign_contacts ?? [])
             .filter((contact) => contact.status !== "skipped")

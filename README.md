@@ -1,6 +1,6 @@
 # OutboundFlow
 
-OutboundFlow is a production-grade internal outbound platform for small teams. It uses Next.js App Router, TypeScript, Tailwind CSS, Supabase Auth/Postgres/Edge Functions, Gmail sending and reply sync, HTML email templates, CRM connectors, billing entitlements, and owned seed inbox monitoring.
+OutboundFlow is a production-grade internal outbound platform for small teams. It uses Next.js App Router, TypeScript, Tailwind CSS, Supabase Auth/Postgres/Edge Functions, Gmail and Outlook sending with reply sync, HTML email templates, CRM connectors, billing entitlements, and owned seed inbox monitoring.
 
 ## Stack
 
@@ -10,7 +10,7 @@ OutboundFlow is a production-grade internal outbound platform for small teams. I
 - Supabase Auth, Postgres, Storage, Edge Functions, Cron
 - React Hook Form + Zod
 - Recharts for dashboard analytics
-- Gmail API for mailbox send and sync
+- Gmail API and Microsoft Graph for mailbox send and sync
 - HubSpot, Salesforce, Pipedrive, and Zoho OAuth for CRM sync
 - Slack, Calendly, Hunter, and signed generic webhooks for workspace integrations
 
@@ -18,7 +18,7 @@ OutboundFlow is a production-grade internal outbound platform for small teams. I
 
 - Direct sign-up with personal workspace creation and shared workspace auto-join
 - Active workspace switching and role-aware shared workspace permissions
-- Gmail mailbox connection with workspace approval gating
+- Gmail and Outlook mailbox connection with workspace approval gating
 - Workflow-based outbound campaigns with tracked events
 - HTML-rendered email template gallery with two seeded ready-to-use templates per workspace
 - Open and click tracking plus reply disposition handling
@@ -80,6 +80,10 @@ docs/
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_OAUTH_REDIRECT_URI`
+- `MICROSOFT_CLIENT_ID`
+- `MICROSOFT_CLIENT_SECRET`
+- `MICROSOFT_TENANT_ID`
+- `MICROSOFT_OAUTH_REDIRECT_URI`
 - `HUBSPOT_CLIENT_ID`
 - `HUBSPOT_CLIENT_SECRET`
 - `HUBSPOT_OAUTH_REDIRECT_URI`
@@ -119,6 +123,7 @@ Apply migrations in order:
 - [supabase/migrations/20260310235900_init_outboundflow.sql](/Users/admin/Desktop/AI/outboundflow/outboundflow-new/emailautomation/emailautomation/supabase/migrations/20260310235900_init_outboundflow.sql)
 - [supabase/migrations/20260320154500_launch_foundations.sql](/Users/admin/Desktop/AI/outboundflow/outboundflow-new/emailautomation/emailautomation/supabase/migrations/20260320154500_launch_foundations.sql)
 - [supabase/migrations/20260320190000_production_completion.sql](/Users/admin/Desktop/AI/outboundflow/outboundflow-new/emailautomation/emailautomation/supabase/migrations/20260320190000_production_completion.sql)
+- [supabase/migrations/20260321223000_mailbox_accounts_outlook.sql](/Users/admin/Desktop/AI/outboundflow/outboundflow-new/emailautomation/emailautomation/supabase/migrations/20260321223000_mailbox_accounts_outlook.sql)
 
 Detailed notes: [docs/supabase-setup.md](/Users/admin/Desktop/AI/outboundflow/outboundflow-new/emailautomation/emailautomation/docs/supabase-setup.md)
 
@@ -146,7 +151,8 @@ The send queue is minute-driven: initial sends and follow-ups are dispatched on 
 - Custom CRM inbound import remains `POST /api/import/custom-crm/contacts`
 - Custom CRM auth is now connection-managed instead of env-managed
 - HubSpot, Salesforce, Pipedrive, and Zoho connect through `/api/crm/connect/[provider]`
-- Slack, generic webhooks, Hunter, and Calendly are managed through `/settings/integrations`
+- Slack, generic webhooks, Hunter, Calendly, Gmail, and Outlook discovery are managed through `/settings/integrations`
+- Operational Gmail and Outlook sender setup lives on `/settings/sending`
 
 Contract details: [docs/custom-crm-import.md](/Users/admin/Desktop/AI/outboundflow/outboundflow-new/emailautomation/emailautomation/docs/custom-crm-import.md)
 
@@ -160,6 +166,7 @@ Contract details: [docs/custom-crm-import.md](/Users/admin/Desktop/AI/outboundfl
 
 - Billing stays internal-only and controls entitlements rather than public payment collection.
 - CRM sync and writeback are centered on `crm_connections`, `crm_sync_runs`, `crm_object_links`, and `crm_push_jobs`.
+- Provider-neutral sender state is centered on `mailbox_accounts`, while Gmail mirror rows remain for compatibility during rollout.
 - Workspace-level non-CRM integrations are centered on `workspace_integrations`.
 - Template seeding is idempotent and happens automatically for new and existing workspaces.
 - Tokens are encrypted server-side with `TOKEN_ENCRYPTION_KEY`.

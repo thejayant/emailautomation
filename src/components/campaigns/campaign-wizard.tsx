@@ -77,7 +77,7 @@ type TemplateDialogState = {
 };
 
 type WizardProps = {
-  gmailAccounts: Array<{ id: string; email_address: string }>;
+  mailboxAccounts: Array<{ id: string; email_address: string; provider: "gmail" | "outlook" }>;
   contacts: ContactRecord[];
   templates: TemplateListItem[];
   mode?: "create" | "edit";
@@ -87,7 +87,7 @@ type WizardProps = {
 };
 
 export function CampaignWizard({
-  gmailAccounts,
+  mailboxAccounts,
   contacts,
   templates,
   mode = "create",
@@ -100,7 +100,7 @@ export function CampaignWizard({
     const baseValues =
       initialValues ??
       buildCampaignWizardInitialValues({
-        gmailAccounts,
+        mailboxAccounts,
         contacts,
         templates,
         selectedTemplateId: initialSelectedTemplateId,
@@ -115,7 +115,7 @@ export function CampaignWizard({
       ...baseValues,
       workflowDefinition: { steps },
     } satisfies CampaignFormValues;
-  }, [contacts, gmailAccounts, initialSelectedTemplateId, initialValues, templates]);
+  }, [contacts, initialSelectedTemplateId, initialValues, mailboxAccounts, templates]);
 
   const findMatchingTemplateId = useMemo(
     () => (step: CampaignFormValues["workflowDefinition"]["steps"][number] | undefined, intent: CampaignTemplateIntent) => {
@@ -182,14 +182,14 @@ export function CampaignWizard({
     control: form.control,
     name: "targetContactIds",
   }) as string[] | undefined;
-  const gmailAccountId = (useWatch({ control: form.control, name: "gmailAccountId" }) ?? "") as string;
+  const mailboxAccountId = (useWatch({ control: form.control, name: "mailboxAccountId" }) ?? "") as string;
   const timezone = (useWatch({ control: form.control, name: "timezone" }) ?? "") as string;
   const sendWindowStart = (useWatch({ control: form.control, name: "sendWindowStart" }) ?? "") as string;
   const sendWindowEnd = (useWatch({ control: form.control, name: "sendWindowEnd" }) ?? "") as string;
   const dailySendLimit = Number(useWatch({ control: form.control, name: "dailySendLimit" }) ?? 0);
   const primaryStep = typedWorkflowSteps[0];
   const followUpStep = typedWorkflowSteps[1];
-  const hasMailbox = gmailAccounts.length > 0;
+  const hasMailbox = mailboxAccounts.length > 0;
   const activeStep = campaignCreatorSteps[currentStepIndex];
   const targetContactIds = useMemo(() => watchedTargetContactIds ?? [], [watchedTargetContactIds]);
 
@@ -234,7 +234,7 @@ export function CampaignWizard({
   const selectedPrimaryTemplate = templates.find((template) => template.id === selectedPrimaryTemplateId) ?? null;
   const selectedFollowUpTemplate = templates.find((template) => template.id === selectedFollowUpTemplateId) ?? null;
   const selectedSenderEmail =
-    gmailAccounts.find((account) => account.id === gmailAccountId)?.email_address ?? null;
+    mailboxAccounts.find((account) => account.id === mailboxAccountId)?.email_address ?? null;
   const checklist = buildLaunchChecklist({
     hasSender: Boolean(selectedSenderEmail),
     selectedContactsCount: targetContactIds.length,
@@ -507,7 +507,7 @@ export function CampaignWizard({
                     {starterType === "template" && selectedPrimaryTemplate ? <div className="rounded-[1.6rem] border border-white/70 bg-white/54 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="grid gap-1"><p className="text-base font-semibold text-foreground">{selectedPrimaryTemplate.name}</p><p className="text-sm text-muted-foreground">{selectedPrimaryTemplate.subject_template}</p></div><Button type="button" variant="outline" size="sm" onClick={() => openTemplateDialog("primary", 0, creatorCopy.start.templateDialogTitle, creatorCopy.start.templateDialogDescription)}>Browse templates</Button></div><p className="mt-3 text-sm leading-6 text-muted-foreground">{getTemplateSnippet(selectedPrimaryTemplate)}</p></div> : null}
                     <div className="grid gap-4 lg:grid-cols-2">
                       <div className="grid gap-2"><Label htmlFor="campaignName">{creatorCopy.start.campaignNameLabel}</Label><Input id="campaignName" placeholder={creatorCopy.start.campaignNamePlaceholder} {...form.register("campaignName")} /><FieldError message={typeof form.formState.errors.campaignName?.message === "string" ? form.formState.errors.campaignName.message : undefined} /></div>
-                      <div className="grid gap-2"><Label htmlFor="gmailAccountId">{creatorCopy.start.senderLabel}</Label><LiquidSelect id="gmailAccountId" ariaLabel={creatorCopy.start.senderLabel} value={gmailAccountId} onValueChange={(value) => form.setValue("gmailAccountId", value, { shouldDirty: true, shouldValidate: true })} disabled={!hasMailbox} placeholder={creatorCopy.start.senderEmptyLabel} triggerClassName="h-12 rounded-[1.15rem]" options={gmailAccounts.map((account) => ({ value: account.id, label: account.email_address, description: "Approved sender mailbox" }))} /><FieldError message={typeof form.formState.errors.gmailAccountId?.message === "string" ? form.formState.errors.gmailAccountId.message : undefined} />{!hasMailbox ? <div className="rounded-[1.45rem] border border-white/70 bg-white/54 p-4"><p className="font-semibold text-foreground">{creatorCopy.start.senderHelperTitle}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{creatorCopy.start.senderHelperBody}</p><div className="mt-3"><Button asChild variant="outline" size="sm"><Link href="/settings/sending">{creatorCopy.start.senderHelperCta}</Link></Button></div></div> : null}</div>
+                      <div className="grid gap-2"><Label htmlFor="mailboxAccountId">{creatorCopy.start.senderLabel}</Label><LiquidSelect id="mailboxAccountId" ariaLabel={creatorCopy.start.senderLabel} value={mailboxAccountId} onValueChange={(value) => form.setValue("mailboxAccountId", value, { shouldDirty: true, shouldValidate: true })} disabled={!hasMailbox} placeholder={creatorCopy.start.senderEmptyLabel} triggerClassName="h-12 rounded-[1.15rem]" options={mailboxAccounts.map((account) => ({ value: account.id, label: account.email_address, description: `${account.provider === "outlook" ? "Outlook" : "Gmail"} approved sender mailbox` }))} /><FieldError message={typeof form.formState.errors.mailboxAccountId?.message === "string" ? form.formState.errors.mailboxAccountId.message : undefined} />{!hasMailbox ? <div className="rounded-[1.45rem] border border-white/70 bg-white/54 p-4"><p className="font-semibold text-foreground">{creatorCopy.start.senderHelperTitle}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{creatorCopy.start.senderHelperBody}</p><div className="mt-3"><Button asChild variant="outline" size="sm"><Link href="/settings/sending">{creatorCopy.start.senderHelperCta}</Link></Button></div></div> : null}</div>
                     </div>
                   </div>
                 ) : null}

@@ -59,7 +59,7 @@ export function buildDefaultWorkflowStep(index: number): CampaignFormValues["wor
 }
 
 export function buildCampaignWizardInitialValues(input: {
-  gmailAccounts: Array<{ id: string; email_address: string }>;
+  mailboxAccounts: Array<{ id: string; email_address: string }>;
   contacts: ContactRecord[];
   templates: CampaignTemplateOption[];
   selectedTemplateId?: string | null;
@@ -79,7 +79,7 @@ export function buildCampaignWizardInitialValues(input: {
 
   return {
     campaignName: "",
-    gmailAccountId: input.gmailAccounts[0]?.id ?? "",
+    mailboxAccountId: input.mailboxAccounts[0]?.id ?? "",
     contactListId: "",
     targetContactIds: input.contacts.slice(0, 3).map((contact) => contact.id),
     timezone: "Asia/Calcutta",

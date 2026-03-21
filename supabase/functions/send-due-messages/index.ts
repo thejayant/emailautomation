@@ -9,10 +9,19 @@ import {
   isTerminalCampaignContactStatus,
   isWithinAllowedSendDay,
 } from "../../../src/lib/campaigns/send-queue-shared.ts";
+import {
+  isAnyMissingColumnResult,
+  isMissingColumnResult,
+} from "../../../src/lib/utils/supabase-schema.ts";
 import { config } from "../shared/config.ts";
-import { decryptToken, encryptToken } from "../shared/crypto.ts";
 import { enqueueCrmWritebackJobs } from "../shared/crm.ts";
-import { gmailRefreshAccessToken, gmailSend } from "../shared/gmail.ts";
+import { gmailSend } from "../shared/gmail.ts";
+import {
+  getMailboxAccountById,
+  resolveMailboxAccess,
+  type WorkerMailboxRecord,
+} from "../shared/mailboxes.ts";
+import { outlookSend } from "../shared/outlook.ts";
 import { json } from "../shared/response.ts";
 
 const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey);
@@ -64,6 +73,8 @@ type ReservedJobRecord = {
       step_number: number;
       status?: string | null;
       sent_at?: string | null;
+      provider_message_id?: string | null;
+      provider_thread_id?: string | null;
       gmail_message_id?: string | null;
       gmail_thread_id?: string | null;
     }> | null;
@@ -74,7 +85,8 @@ type ReservedJobRecord = {
     project_id: string;
     name: string;
     status: string;
-    gmail_account_id: string;
+    mailbox_account_id?: string | null;
+    gmail_account_id?: string | null;
     workflow_definition_jsonb?: { steps?: Array<Record<string, unknown>> } | null;
     daily_send_limit: number;
     send_window_start: string;
@@ -270,48 +282,34 @@ function resolveWorkflowAdvance(
       };
 }
 
-async function resolveMailboxAccess(mailbox: {
-  oauth_connection?: {
-    id?: string;
-    access_token_encrypted?: string | null;
-    refresh_token_encrypted?: string | null;
-    token_expiry?: string | null;
-  } | null;
+async function sendWithMailboxProvider(input: {
+  mailbox: WorkerMailboxRecord;
+  accessToken: string;
+  toEmail: string;
+  subject: string;
+  bodyHtml: string;
+  replyThreadId?: string | null;
+  replyMessageId?: string | null;
 }) {
-  const oauthConnection = mailbox.oauth_connection;
-
-  if (!oauthConnection) {
-    throw new Error("Missing oauth connection.");
+  if (input.mailbox.provider === "outlook") {
+    return outlookSend({
+      accessToken: input.accessToken,
+      toEmail: input.toEmail,
+      subject: input.subject,
+      bodyHtml: input.bodyHtml,
+      replyThreadId: input.replyThreadId,
+      replyMessageId: input.replyMessageId,
+    });
   }
 
-  const shouldRefresh =
-    !oauthConnection.access_token_encrypted ||
-    (oauthConnection.token_expiry &&
-      new Date(oauthConnection.token_expiry).getTime() <= Date.now() + 60_000);
-
-  if (!shouldRefresh && oauthConnection.access_token_encrypted) {
-    return decryptToken(oauthConnection.access_token_encrypted);
-  }
-
-  if (!oauthConnection.refresh_token_encrypted) {
-    throw new Error("Missing refresh token.");
-  }
-
-  const refreshed = await gmailRefreshAccessToken(
-    await decryptToken(oauthConnection.refresh_token_encrypted),
-  );
-
-  await supabase
-    .from("oauth_connections")
-    .update({
-      access_token_encrypted: await encryptToken(refreshed.access_token),
-      token_expiry: refreshed.expires_in
-        ? new Date(Date.now() + Number(refreshed.expires_in) * 1000).toISOString()
-        : null,
-    })
-    .eq("id", oauthConnection.id);
-
-  return refreshed.access_token as string;
+  return gmailSend({
+    accessToken: input.accessToken,
+    fromEmail: input.mailbox.email_address,
+    toEmail: input.toEmail,
+    subject: input.subject,
+    bodyHtml: input.bodyHtml,
+    threadId: input.replyThreadId ?? null,
+  });
 }
 
 async function getWorkspaceSendState(workspaceId: string) {
@@ -593,8 +591,17 @@ function isPermanentSendError(message: string) {
     normalized.includes("missing oauth connection") ||
     normalized.includes("invalid_grant") ||
     normalized.includes("insufficient permissions") ||
-    normalized.includes("mailbox connection not found")
+    normalized.includes("mailbox connection not found") ||
+    normalized.includes("mailbox-account migration")
   );
+}
+
+function assertMailboxMigrationReady(mailbox: WorkerMailboxRecord) {
+  if (mailbox.provider === "outlook") {
+    throw new Error(
+      "Outlook senders require the latest mailbox-account migration. Apply the current Supabase migrations and retry.",
+    );
+  }
 }
 
 function buildRenderedContent(input: {
@@ -623,12 +630,26 @@ function buildRenderedContent(input: {
 }
 
 async function ensureOutboundMessageRecord(campaignContactId: string, stepNumber: number) {
-  const existingResult = await supabase
+  let existingResult = await supabase
     .from("outbound_messages")
-    .select("id, status, sent_at, gmail_message_id, gmail_thread_id")
+    .select("id, status, sent_at, provider_message_id, provider_thread_id, gmail_message_id, gmail_thread_id")
     .eq("campaign_contact_id", campaignContactId)
     .eq("step_number", stepNumber)
     .maybeSingle();
+
+  if (
+    isAnyMissingColumnResult(existingResult, [
+      { table: "outbound_messages", column: "provider_message_id" },
+      { table: "outbound_messages", column: "provider_thread_id" },
+    ])
+  ) {
+    existingResult = await supabase
+      .from("outbound_messages")
+      .select("id, status, sent_at, gmail_message_id, gmail_thread_id")
+      .eq("campaign_contact_id", campaignContactId)
+      .eq("step_number", stepNumber)
+      .maybeSingle();
+  }
 
   if (existingResult.error) {
     throw existingResult.error;
@@ -639,6 +660,8 @@ async function ensureOutboundMessageRecord(campaignContactId: string, stepNumber
         id: string;
         status?: string | null;
         sent_at?: string | null;
+        provider_message_id?: string | null;
+        provider_thread_id?: string | null;
         gmail_message_id?: string | null;
         gmail_thread_id?: string | null;
       }
@@ -648,24 +671,43 @@ async function ensureOutboundMessageRecord(campaignContactId: string, stepNumber
     return existing;
   }
 
-  const { data, error } = await supabase
+  let insertResult = await supabase
     .from("outbound_messages")
     .insert({
       campaign_contact_id: campaignContactId,
       step_number: stepNumber,
       status: "queued",
     })
-    .select("id, status, sent_at, gmail_message_id, gmail_thread_id")
+    .select("id, status, sent_at, provider_message_id, provider_thread_id, gmail_message_id, gmail_thread_id")
     .single();
 
-  if (error) {
-    throw error;
+  if (
+    isAnyMissingColumnResult(insertResult, [
+      { table: "outbound_messages", column: "provider_message_id" },
+      { table: "outbound_messages", column: "provider_thread_id" },
+    ])
+  ) {
+    insertResult = await supabase
+      .from("outbound_messages")
+      .insert({
+        campaign_contact_id: campaignContactId,
+        step_number: stepNumber,
+        status: "queued",
+      })
+      .select("id, status, sent_at, gmail_message_id, gmail_thread_id")
+      .single();
   }
 
-  return data as {
+  if (insertResult.error) {
+    throw insertResult.error;
+  }
+
+  return insertResult.data as {
     id: string;
     status?: string | null;
     sent_at?: string | null;
+    provider_message_id?: string | null;
+    provider_thread_id?: string | null;
     gmail_message_id?: string | null;
     gmail_thread_id?: string | null;
   };
@@ -689,7 +731,7 @@ async function getCampaignDaySendCount(campaignId: string, timezone: string, bas
 }
 
 async function loadReservedJobs(jobIds: string[]) {
-  const { data, error } = await supabase
+  let result = await supabase
     .from("campaign_send_jobs")
     .select(
       `
@@ -719,7 +761,7 @@ async function loadReservedJobs(jobIds: string[]) {
           custom_fields_jsonb,
           unsubscribed_at
         ),
-        outbound_messages(id, step_number, status, sent_at, gmail_message_id, gmail_thread_id)
+        outbound_messages(id, step_number, status, sent_at, provider_message_id, provider_thread_id, gmail_message_id, gmail_thread_id)
       ),
       campaign:campaigns(
         id,
@@ -727,6 +769,7 @@ async function loadReservedJobs(jobIds: string[]) {
         project_id,
         name,
         status,
+        mailbox_account_id,
         gmail_account_id,
         workflow_definition_jsonb,
         daily_send_limit,
@@ -741,11 +784,71 @@ async function loadReservedJobs(jobIds: string[]) {
     .in("id", jobIds)
     .order("scheduled_for", { ascending: true });
 
-  if (error) {
-    throw error;
+  if (
+    isAnyMissingColumnResult(result, [
+      { table: "campaigns", column: "mailbox_account_id" },
+      { table: "outbound_messages", column: "provider_message_id" },
+      { table: "outbound_messages", column: "provider_thread_id" },
+    ])
+  ) {
+    result = await supabase
+      .from("campaign_send_jobs")
+      .select(
+        `
+        id,
+        campaign_id,
+        campaign_contact_id,
+        step_number,
+        status,
+        scheduled_for,
+        attempt_count,
+        reservation_token,
+        campaign_contact:campaign_contacts(
+          id,
+          contact_id,
+          status,
+          current_step,
+          failed_attempts,
+          last_thread_id,
+          last_message_id,
+          contact:contacts(
+            email,
+            first_name,
+            last_name,
+            company,
+            website,
+            job_title,
+            custom_fields_jsonb,
+            unsubscribed_at
+          ),
+          outbound_messages(id, step_number, status, sent_at, gmail_message_id, gmail_thread_id)
+        ),
+        campaign:campaigns(
+          id,
+          workspace_id,
+          project_id,
+          name,
+          status,
+          gmail_account_id,
+          workflow_definition_jsonb,
+          daily_send_limit,
+          send_window_start,
+          send_window_end,
+          timezone,
+          allowed_send_days,
+          campaign_steps(step_number, step_type, subject_template, body_template, body_html_template, wait_days)
+        )
+      `,
+      )
+      .in("id", jobIds)
+      .order("scheduled_for", { ascending: true });
   }
 
-  return (data as ReservedJobRecord[] | null) ?? [];
+  if (result.error) {
+    throw result.error;
+  }
+
+  return (result.data as ReservedJobRecord[] | null) ?? [];
 }
 
 Deno.serve(async (request) => {
@@ -1007,17 +1110,8 @@ Deno.serve(async (request) => {
         continue;
       }
 
-      const { data: mailbox, error: mailboxError } = await supabase
-        .from("gmail_accounts")
-        .select(
-          "id, project_id, email_address, approval_status, oauth_connection:oauth_connections(id, access_token_encrypted, refresh_token_encrypted, token_expiry)",
-        )
-        .eq("id", campaign.gmail_account_id)
-        .single();
-
-      if (mailboxError) {
-        throw mailboxError;
-      }
+      const mailboxAccountId = campaign.mailbox_account_id ?? campaign.gmail_account_id ?? null;
+      const mailbox = mailboxAccountId ? await getMailboxAccountById(supabase, mailboxAccountId) : null;
 
       if (!mailbox || (mailbox.approval_status && mailbox.approval_status !== "approved")) {
         await releaseReservedJob({
@@ -1063,8 +1157,14 @@ Deno.serve(async (request) => {
             campaign,
             campaignContact: {
               ...campaignContact,
-              last_thread_id: provisionalOutbound.gmail_thread_id ?? campaignContact.last_thread_id,
-              last_message_id: provisionalOutbound.gmail_message_id ?? campaignContact.last_message_id,
+              last_thread_id:
+                provisionalOutbound.provider_thread_id ??
+                provisionalOutbound.gmail_thread_id ??
+                campaignContact.last_thread_id,
+              last_message_id:
+                provisionalOutbound.provider_message_id ??
+                provisionalOutbound.gmail_message_id ??
+                campaignContact.last_message_id,
             },
             nextStep,
             scheduledFor,
@@ -1072,8 +1172,16 @@ Deno.serve(async (request) => {
           await supabase
             .from("campaign_contacts")
             .update({
-              last_thread_id: provisionalOutbound.gmail_thread_id ?? campaignContact.last_thread_id ?? null,
-              last_message_id: provisionalOutbound.gmail_message_id ?? campaignContact.last_message_id ?? null,
+              last_thread_id:
+                provisionalOutbound.provider_thread_id ??
+                provisionalOutbound.gmail_thread_id ??
+                campaignContact.last_thread_id ??
+                null,
+              last_message_id:
+                provisionalOutbound.provider_message_id ??
+                provisionalOutbound.gmail_message_id ??
+                campaignContact.last_message_id ??
+                null,
               error_message: null,
             })
             .eq("id", campaignContact.id);
@@ -1084,8 +1192,16 @@ Deno.serve(async (request) => {
               status: step.stepNumber > 1 ? "followup_sent" : "sent",
               current_step: step.stepNumber,
               next_due_at: null,
-              last_thread_id: provisionalOutbound.gmail_thread_id ?? campaignContact.last_thread_id ?? null,
-              last_message_id: provisionalOutbound.gmail_message_id ?? campaignContact.last_message_id ?? null,
+              last_thread_id:
+                provisionalOutbound.provider_thread_id ??
+                provisionalOutbound.gmail_thread_id ??
+                campaignContact.last_thread_id ??
+                null,
+              last_message_id:
+                provisionalOutbound.provider_message_id ??
+                provisionalOutbound.gmail_message_id ??
+                campaignContact.last_message_id ??
+                null,
               error_message: null,
             })
             .eq("id", campaignContact.id);
@@ -1096,7 +1212,7 @@ Deno.serve(async (request) => {
       }
 
       try {
-        const accessToken = await resolveMailboxAccess(mailbox);
+        const accessToken = await resolveMailboxAccess(supabase, mailbox);
         const unsubscribeToken = crypto.randomUUID();
         const unsubscribeLink = `${Deno.env.get("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}/api/unsubscribes/${unsubscribeToken}`;
         const rendered = buildRenderedContent({
@@ -1110,40 +1226,94 @@ Deno.serve(async (request) => {
           stepNumber: step.stepNumber,
           html: rendered.bodyHtml,
         });
-        const sendResult = await gmailSend({
+        const sendResult = await sendWithMailboxProvider({
+          mailbox,
           accessToken,
-          fromEmail: mailbox.email_address,
           toEmail: contact.email,
           subject: rendered.subject,
           bodyHtml: trackedHtml,
-          threadId: step.stepNumber > 1 ? campaignContact.last_thread_id ?? null : null,
+          replyThreadId: step.stepNumber > 1 ? campaignContact.last_thread_id ?? null : null,
+          replyMessageId: step.stepNumber > 1 ? campaignContact.last_message_id ?? null : null,
         });
 
         const sentAt = new Date().toISOString();
         const nextStep = workflowSteps.find(
           (candidate) => Number(candidate.stepNumber) === Number(step.stepNumber) + 1,
         );
+        const resolvedThreadId = sendResult.threadId || sendResult.id || crypto.randomUUID();
 
-        await supabase
+        let outboundUpdateResult = await supabase
           .from("outbound_messages")
           .update({
             gmail_message_id: sendResult.id ?? null,
-            gmail_thread_id: sendResult.threadId ?? null,
+            gmail_thread_id: resolvedThreadId,
+            provider_message_id: sendResult.id ?? null,
+            provider_thread_id: resolvedThreadId,
             sent_at: sentAt,
             status: "sent",
             error_message: null,
           })
           .eq("id", provisionalOutbound.id);
 
-        await supabase.from("message_threads").upsert({
-          workspace_id: campaign.workspace_id,
-          project_id: campaign.project_id,
-          campaign_contact_id: campaignContact.id,
-          gmail_thread_id: sendResult.threadId || sendResult.id || crypto.randomUUID(),
-          subject: rendered.subject,
-          snippet: rendered.snippet,
-          latest_message_at: sentAt,
-        });
+        if (
+          isAnyMissingColumnResult(outboundUpdateResult, [
+            { table: "outbound_messages", column: "provider_message_id" },
+            { table: "outbound_messages", column: "provider_thread_id" },
+          ])
+        ) {
+          assertMailboxMigrationReady(mailbox);
+          outboundUpdateResult = await supabase
+            .from("outbound_messages")
+            .update({
+              gmail_message_id: sendResult.id ?? null,
+              gmail_thread_id: resolvedThreadId,
+              sent_at: sentAt,
+              status: "sent",
+              error_message: null,
+            })
+            .eq("id", provisionalOutbound.id);
+        }
+
+        if (outboundUpdateResult.error) {
+          throw outboundUpdateResult.error;
+        }
+
+        let threadUpsertResult = await supabase.from("message_threads").upsert(
+          {
+            workspace_id: campaign.workspace_id,
+            project_id: campaign.project_id,
+            campaign_contact_id: campaignContact.id,
+            mailbox_account_id: mailbox.id,
+            provider_thread_id: resolvedThreadId,
+            gmail_thread_id: resolvedThreadId,
+            subject: rendered.subject,
+            snippet: rendered.snippet,
+            latest_message_at: sentAt,
+          },
+          { onConflict: "mailbox_account_id,provider_thread_id" },
+        );
+
+        if (
+          isAnyMissingColumnResult(threadUpsertResult, [
+            { table: "message_threads", column: "mailbox_account_id" },
+            { table: "message_threads", column: "provider_thread_id" },
+          ])
+        ) {
+          assertMailboxMigrationReady(mailbox);
+          threadUpsertResult = await supabase.from("message_threads").upsert({
+            workspace_id: campaign.workspace_id,
+            project_id: campaign.project_id,
+            campaign_contact_id: campaignContact.id,
+            gmail_thread_id: resolvedThreadId,
+            subject: rendered.subject,
+            snippet: rendered.snippet,
+            latest_message_at: sentAt,
+          });
+        }
+
+        if (threadUpsertResult.error) {
+          throw threadUpsertResult.error;
+        }
 
         await upsertUnsubscribeRecord({
           workspaceId: campaign.workspace_id,
@@ -1152,18 +1322,41 @@ Deno.serve(async (request) => {
           token: unsubscribeToken,
         });
 
-        await supabase.from("message_events").insert({
+        let messageEventResult = await supabase.from("message_events").insert({
           workspace_id: campaign.workspace_id,
           campaign_contact_id: campaignContact.id,
           outbound_message_id: provisionalOutbound.id,
           gmail_message_id: sendResult.id ?? null,
+          provider_message_id: sendResult.id ?? null,
           event_type: "sent",
           metadata: {
             stepNumber: step.stepNumber,
             subject: rendered.subject,
             toEmail: contact.email,
+            provider: mailbox.provider,
           },
         });
+
+        if (isMissingColumnResult(messageEventResult, "message_events", "provider_message_id")) {
+          assertMailboxMigrationReady(mailbox);
+          messageEventResult = await supabase.from("message_events").insert({
+            workspace_id: campaign.workspace_id,
+            campaign_contact_id: campaignContact.id,
+            outbound_message_id: provisionalOutbound.id,
+            gmail_message_id: sendResult.id ?? null,
+            event_type: "sent",
+            metadata: {
+              stepNumber: step.stepNumber,
+              subject: rendered.subject,
+              toEmail: contact.email,
+              provider: mailbox.provider,
+            },
+          });
+        }
+
+        if (messageEventResult.error) {
+          throw messageEventResult.error;
+        }
         await enqueueCrmWritebackJobs({
           supabase,
           workspaceId: campaign.workspace_id,
@@ -1172,6 +1365,7 @@ Deno.serve(async (request) => {
           metadata: {
             stepNumber: step.stepNumber,
             subject: rendered.subject,
+            provider: mailbox.provider,
           },
         });
 
@@ -1201,7 +1395,7 @@ Deno.serve(async (request) => {
           await supabase
             .from("campaign_contacts")
             .update({
-              last_thread_id: sendResult.threadId ?? null,
+              last_thread_id: resolvedThreadId,
               last_message_id: sendResult.id ?? null,
               error_message: null,
             })
@@ -1213,7 +1407,7 @@ Deno.serve(async (request) => {
               status: step.stepNumber > 1 ? "followup_sent" : "sent",
               current_step: step.stepNumber,
               next_due_at: null,
-              last_thread_id: sendResult.threadId ?? null,
+              last_thread_id: resolvedThreadId,
               last_message_id: sendResult.id ?? null,
               error_message: null,
             })

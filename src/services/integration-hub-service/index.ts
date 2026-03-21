@@ -8,7 +8,7 @@ import {
 } from "@/lib/integrations/hub";
 import { type IntegrationConnectionHealth } from "@/lib/integrations/types";
 import { listWorkspaceCrmConnections } from "@/services/crm-service";
-import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
+import { getWorkspaceMailboxAccounts } from "@/services/mailbox-service";
 import { listWorkspaceIntegrations } from "@/services/workspace-integration-service";
 
 type CrmConnectionSummary = {
@@ -27,8 +27,10 @@ type CrmConnectionSummary = {
 
 type WorkspaceMailboxSummary = {
   id: string;
+  provider: "gmail" | "outlook";
   status?: string | null;
   approval_status?: string | null;
+  email_address?: string | null;
 };
 
 function normalizeCrmStatus(status: string): "connected" | "error" | "disconnected" {
@@ -226,10 +228,10 @@ function buildTileConnectionSummary(connections: IntegrationHubConnectionItem[])
 }
 
 export async function getWorkspaceIntegrationsHubData(workspaceId: string): Promise<IntegrationsHubData> {
-  const [crmConnections, workspaceIntegrations, gmailAccounts] = await Promise.all([
+  const [crmConnections, workspaceIntegrations, mailboxAccounts] = await Promise.all([
     listWorkspaceCrmConnections(workspaceId),
     listWorkspaceIntegrations(workspaceId),
-    getWorkspaceGmailAccounts(workspaceId).catch(() => []),
+    getWorkspaceMailboxAccounts(workspaceId).catch(() => []),
   ]);
 
   const allConnections = [
@@ -260,16 +262,50 @@ export async function getWorkspaceIntegrationsHubData(workspaceId: string): Prom
     const entries = section.entries.map((entry) => {
       const providerConnections = allConnections.filter((connection) => connection.provider === entry.key);
       const liveConnections = providerConnections.filter((connection) => connection.status !== "disconnected");
+      const providerMailboxes = (mailboxAccounts as WorkspaceMailboxSummary[]).filter(
+        (mailbox) => mailbox.provider === entry.key,
+      );
+      const liveMailboxes = providerMailboxes.filter((mailbox) => mailbox.status === "active");
+      const hasMailboxAttention = liveMailboxes.some(
+        (mailbox) => mailbox.approval_status && mailbox.approval_status !== "approved",
+      );
+      const mailboxTileStatus =
+        liveMailboxes.length > 0
+          ? hasMailboxAttention
+            ? ("error" as const)
+            : ("connected" as const)
+          : providerMailboxes.length > 0
+            ? ("disconnected" as const)
+            : ("available" as const);
 
       return {
         ...entry,
         provider: entry.key,
-        status: buildTileStatus(providerConnections),
-        connectionCount: liveConnections.length,
-        connectionSummary: buildTileConnectionSummary(providerConnections),
+        status: section.key === "mailboxes" ? mailboxTileStatus : buildTileStatus(providerConnections),
+        connectionCount: section.key === "mailboxes" ? liveMailboxes.length : liveConnections.length,
+        connectionSummary:
+          section.key === "mailboxes"
+            ? liveMailboxes.length === 1
+              ? liveMailboxes[0]?.email_address ?? null
+              : liveMailboxes.length > 1
+                ? `${liveMailboxes.length} mailboxes ready`
+                : providerMailboxes.length > 0
+                  ? "Previously connected"
+                  : null
+            : buildTileConnectionSummary(providerConnections),
         primaryConnectionId: liveConnections[0]?.id ?? providerConnections[0]?.id ?? null,
-        primaryAccountLabel: liveConnections[0]?.accountLabel ?? providerConnections[0]?.accountLabel ?? null,
-        primaryHealth: liveConnections[0]?.health ?? null,
+        primaryAccountLabel:
+          section.key === "mailboxes"
+            ? liveMailboxes[0]?.email_address ?? providerMailboxes[0]?.email_address ?? null
+            : liveConnections[0]?.accountLabel ?? providerConnections[0]?.accountLabel ?? null,
+        primaryHealth:
+          section.key === "mailboxes"
+            ? liveMailboxes.length > 0
+              ? hasMailboxAttention
+                ? "needs_attention"
+                : "healthy"
+              : null
+            : liveConnections[0]?.health ?? null,
       } satisfies IntegrationHubTile;
     });
 
@@ -281,7 +317,7 @@ export async function getWorkspaceIntegrationsHubData(workspaceId: string): Prom
   });
 
   const activeCategories = new Set(connectedItems.map((connection) => connection.category));
-  const mailboxSummary = (gmailAccounts as WorkspaceMailboxSummary[]).reduce(
+  const mailboxSummary = (mailboxAccounts as WorkspaceMailboxSummary[]).reduce(
     (summary, account) => {
       const active = String(account.status ?? "").trim().toLowerCase() === "active";
       const approved = String(account.approval_status ?? "").trim().toLowerCase() === "approved";
@@ -299,6 +335,10 @@ export async function getWorkspaceIntegrationsHubData(workspaceId: string): Prom
       pendingCount: 0,
     },
   );
+
+  if (mailboxSummary.totalCount > 0) {
+    activeCategories.add("mailboxes");
+  }
 
   return {
     overview: {

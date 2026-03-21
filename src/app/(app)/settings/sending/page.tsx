@@ -1,48 +1,100 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Mail, ShieldCheck, Signature } from "lucide-react";
-import { ProjectAvatar } from "@/components/projects/project-avatar";
-import { GmailConnectButton } from "@/components/profile/gmail-connect-button";
+import { ArrowUpRight, ChevronRight, Mail, ShieldCheck, Signature } from "lucide-react";
+import { GmailMark } from "@/components/icons/gmail-mark";
 import { PageHeader } from "@/components/layout/page-header";
+import { ProjectAvatar } from "@/components/projects/project-avatar";
+import { MailboxConnectButton } from "@/components/profile/gmail-connect-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWorkspaceContext } from "@/lib/db/workspace";
-import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
+import { OUTLOOK_ICON_URL } from "@/lib/mailboxes/provider";
+import { getWorkspaceMailboxAccounts } from "@/services/mailbox-service";
 import { listWorkspaceProjectMailboxRegistry } from "@/services/project-service";
 
 type SendingPageProps = {
   searchParams?: Promise<{
     gmail?: string;
+    mailbox?: string;
     message?: string;
+    provider?: string;
   }>;
 };
 
-function getGmailBanner(gmail?: string, message?: string) {
-  if (gmail === "connected") {
+type MailboxListItem = {
+  id: string;
+  provider: "gmail" | "outlook";
+  email_address: string;
+  provider_account_label?: string | null;
+  status: string;
+  approval_status?: string | null;
+  approval_note?: string | null;
+};
+
+function getProviderTitle(provider: string | null | undefined) {
+  return provider === "outlook" ? "Outlook" : "Gmail";
+}
+
+function ProviderMark({
+  provider,
+  className = "size-5",
+}: {
+  provider: "gmail" | "outlook";
+  className?: string;
+}) {
+  if (provider === "outlook") {
+    return (
+      <Image
+        src={OUTLOOK_ICON_URL}
+        alt=""
+        width={48}
+        height={48}
+        className={`${className} rounded-sm`}
+      />
+    );
+  }
+
+  return <GmailMark className={className} />;
+}
+
+function ProviderBadge({ provider }: { provider: "gmail" | "outlook" }) {
+  return (
+    <Badge variant="neutral" className="gap-1.5">
+      <ProviderMark provider={provider} className="size-3.5" />
+      {getProviderTitle(provider)}
+    </Badge>
+  );
+}
+
+function getMailboxBanner(mailbox?: string, message?: string, provider?: string) {
+  const providerTitle = getProviderTitle(provider);
+
+  if (mailbox === "connected") {
     return {
       tone: "success" as const,
-      text: "Mailbox connected successfully.",
+      text: `${providerTitle} mailbox connected successfully.`,
     };
   }
 
-  if (gmail === "disconnected") {
+  if (mailbox === "disconnected") {
     return {
       tone: "default" as const,
-      text: "Mailbox disconnected.",
+      text: `${providerTitle} mailbox disconnected.`,
     };
   }
 
-  if (gmail === "missing-code") {
+  if (mailbox === "missing-code") {
     return {
       tone: "error" as const,
-      text: "Mailbox connection could not be completed because the Google callback was missing a code.",
+      text: `${providerTitle} connection could not be completed because the callback was missing a code.`,
     };
   }
 
-  if (gmail === "error") {
+  if (mailbox === "error") {
     return {
       tone: "error" as const,
-      text: message ? decodeURIComponent(message) : "Mailbox connection failed.",
+      text: message ? decodeURIComponent(message) : `${providerTitle} mailbox connection failed.`,
     };
   }
 
@@ -51,26 +103,19 @@ function getGmailBanner(gmail?: string, message?: string) {
 
 export default async function SettingsSendingPage({ searchParams }: SendingPageProps) {
   const params = (await searchParams) ?? {};
+  const mailboxStatus = params.mailbox ?? params.gmail;
   const workspace = await getWorkspaceContext();
   const canManage = ["owner", "admin"].includes(workspace.workspaceRole);
   const [activeProjectMailboxes, projectRegistry] = await Promise.all([
-    getWorkspaceGmailAccounts(workspace.workspaceId, {
+    getWorkspaceMailboxAccounts(workspace.workspaceId, {
       projectId: workspace.activeProjectId,
-    }) as Promise<
-      Array<{
-        id: string;
-        email_address: string;
-        status: string;
-        approval_status?: string | null;
-        approval_note?: string | null;
-      }>
-    >,
+    }) as Promise<MailboxListItem[]>,
     listWorkspaceProjectMailboxRegistry(workspace.workspaceId),
   ]);
-  const gmailBanner = getGmailBanner(params.gmail, params.message);
+  const mailboxBanner = getMailboxBanner(mailboxStatus, params.message, params.provider);
   const flattenedMailboxes = projectRegistry
     .flatMap((project) =>
-      project.gmailAccounts.map((account) => ({
+      project.mailboxAccounts.map((account) => ({
         ...account,
         projectId: project.id,
         projectName: project.name,
@@ -87,21 +132,28 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
       <PageHeader
         eyebrow={workspace.workspaceName}
         title="Sending"
-        description="Connect mailboxes, approve sender identities, and keep every sending address tied to the right project before campaigns go live."
-        actions={<GmailConnectButton label="Connect mailbox" />}
+        description="Connect Gmail and Outlook senders, approve mailbox identities, and keep every sending address aligned to the right project before campaigns go live."
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/settings/integrations">
+              Open integrations
+              <ArrowUpRight className="size-4" />
+            </Link>
+          </Button>
+        }
       />
 
-      {gmailBanner ? (
+      {mailboxBanner ? (
         <div
           className={
-            gmailBanner.tone === "error"
+            mailboxBanner.tone === "error"
               ? "rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
-              : gmailBanner.tone === "success"
+              : mailboxBanner.tone === "success"
                 ? "rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700"
                 : "rounded-2xl border border-white/70 bg-white/72 px-4 py-3 text-sm text-foreground"
           }
         >
-          {gmailBanner.text}
+          {mailboxBanner.text}
         </div>
       ) : null}
 
@@ -113,9 +165,9 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
                 <Mail className="size-5" />
               </span>
               <div className="space-y-1">
-                <CardTitle>Connect mailbox</CardTitle>
+                <CardTitle>Connect sender mailboxes</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  This is now the source of truth for sender setup across the workspace.
+                  Gmail and Outlook both attach to the active project here, while third-party routing stays on the integrations page.
                 </p>
               </div>
             </div>
@@ -131,11 +183,45 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
                 <div className="min-w-0 space-y-1">
                   <p className="text-sm font-semibold text-foreground">{workspace.activeProject.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    New mailboxes connected here attach to the active project.
+                    New sender connections created here attach to the active project.
                   </p>
                 </div>
               </div>
               <Badge variant="success">Active project</Badge>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {[
+                {
+                  description: "Google Workspace or Gmail senders with the existing approval flow.",
+                  label: "Gmail",
+                  provider: "gmail" as const,
+                },
+                {
+                  description: "Microsoft 365 or Outlook senders with provider-neutral mailbox sync.",
+                  label: "Outlook",
+                  provider: "outlook" as const,
+                },
+              ].map((provider) => (
+                <div
+                  key={provider.provider}
+                  className="grid gap-4 rounded-[1.35rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,249,252,0.86))] p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-11 items-center justify-center rounded-[1rem] border border-white/74 bg-white/92 text-accent-foreground">
+                      <ProviderMark provider={provider.provider} className="size-5" />
+                    </span>
+                    <div className="grid gap-1">
+                      <p className="text-base font-semibold tracking-[-0.03em] text-foreground">{provider.label}</p>
+                      <p className="text-sm leading-6 text-muted-foreground">{provider.description}</p>
+                    </div>
+                  </div>
+                  <MailboxConnectButton
+                    provider={provider.provider}
+                    label={`Connect ${provider.label}`}
+                  />
+                </div>
+              ))}
             </div>
 
             {activeProjectMailboxes.length ? (
@@ -145,17 +231,25 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
                     key={account.id}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/60 bg-white/58 px-4 py-3 text-sm"
                   >
-                    <div>
-                      <p className="font-medium text-foreground">{account.email_address}</p>
+                    <div className="grid gap-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-foreground">{account.email_address}</p>
+                        <ProviderBadge provider={account.provider} />
+                      </div>
                       <p className="text-muted-foreground">
                         {account.status} / {account.approval_status ?? "pending"}
                       </p>
+                      {account.provider_account_label &&
+                      account.provider_account_label !== account.email_address ? (
+                        <p className="text-xs text-muted-foreground">{account.provider_account_label}</p>
+                      ) : null}
                       {account.approval_note ? (
                         <p className="text-xs text-muted-foreground">{account.approval_note}</p>
                       ) : null}
                     </div>
-                    <form action="/api/gmail/disconnect" method="post">
-                      <input type="hidden" name="gmailAccountId" value={account.id} />
+                    <form action="/api/mailboxes/disconnect" method="post">
+                      <input type="hidden" name="mailboxAccountId" value={account.id} />
+                      <input type="hidden" name="provider" value={account.provider} />
                       <Button size="sm" type="submit" variant="outline">
                         Disconnect
                       </Button>
@@ -165,7 +259,7 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
               </div>
             ) : (
               <div className="rounded-[1.35rem] border border-dashed border-border/70 bg-background/70 px-4 py-5 text-sm text-muted-foreground">
-                No mailbox is connected to the active project yet. Connect Gmail here so campaigns can send from a real sender.
+                No mailbox is connected to the active project yet. Connect Gmail or Outlook here so campaigns can send from a real sender.
               </div>
             )}
           </CardContent>
@@ -245,7 +339,7 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
             <div className="space-y-1">
               <CardTitle>Sender approvals</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Approvals are visible to everyone, but only owners and admins can approve or reject mailboxes.
+                Approvals are visible to everyone, but only owners and admins can approve or reject sender mailboxes.
               </p>
             </div>
           </div>
@@ -259,7 +353,10 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-foreground">{account.email_address}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{account.email_address}</p>
+                      <ProviderBadge provider={account.provider} />
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {account.projectName} · {account.status}
                     </p>
@@ -273,13 +370,15 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
                 </div>
                 {canManage && account.approval_status !== "approved" ? (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <form action="/api/gmail/approve" method="post">
-                      <input type="hidden" name="gmailAccountId" value={account.id} />
+                    <form action="/api/mailboxes/approve" method="post">
+                      <input type="hidden" name="mailboxAccountId" value={account.id} />
+                      <input type="hidden" name="provider" value={account.provider} />
                       <input type="hidden" name="approvalStatus" value="approved" />
                       <Button size="sm" type="submit">Approve sender</Button>
                     </form>
-                    <form action="/api/gmail/approve" method="post">
-                      <input type="hidden" name="gmailAccountId" value={account.id} />
+                    <form action="/api/mailboxes/approve" method="post">
+                      <input type="hidden" name="mailboxAccountId" value={account.id} />
+                      <input type="hidden" name="provider" value={account.provider} />
                       <input type="hidden" name="approvalStatus" value="rejected" />
                       <Button size="sm" type="submit" variant="outline">Reject</Button>
                     </form>
@@ -301,7 +400,7 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
             <div className="space-y-1">
               <CardTitle>Mailbox registry by project</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Review every sending mailbox grouped under the project it belongs to.
+                Review every approved or pending sending mailbox grouped under the project it belongs to.
               </p>
             </div>
             <Button asChild variant="outline" size="sm">
@@ -333,14 +432,17 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
                 {project.id === workspace.activeProjectId ? <Badge variant="success">Active</Badge> : null}
               </div>
               <div className="mt-4 grid gap-3">
-                {project.gmailAccounts.length ? (
-                  project.gmailAccounts.map((account) => (
+                {project.mailboxAccounts.length ? (
+                  project.mailboxAccounts.map((account) => (
                     <div
                       key={account.id}
                       className="rounded-[1.15rem] border border-white/60 bg-white/76 px-4 py-3 text-sm"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="font-medium text-foreground">{account.email_address}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-foreground">{account.email_address}</p>
+                          <ProviderBadge provider={account.provider} />
+                        </div>
                         <Badge
                           variant={account.approval_status === "approved" ? "success" : "neutral"}
                         >

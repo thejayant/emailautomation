@@ -7,13 +7,15 @@ import {
   isSlackConfigured,
   isZohoConfigured,
 } from "@/lib/supabase/env";
+import { OUTLOOK_ICON_URL } from "@/lib/mailboxes/provider";
 import {
   type IntegrationCategory,
   type WorkspaceIntegrationProvider,
 } from "@/lib/integrations/types";
 import { type CrmProvider } from "@/services/crm-adapters";
+import type { MailboxProviderKey } from "@/services/mailbox-providers/types";
 
-export type IntegrationProviderKey = CrmProvider | WorkspaceIntegrationProvider;
+export type IntegrationProviderKey = CrmProvider | WorkspaceIntegrationProvider | MailboxProviderKey;
 
 export type IntegrationCatalogEntry = {
   key: IntegrationProviderKey;
@@ -26,7 +28,8 @@ export type IntegrationCatalogEntry = {
   sortOrder: number;
   detailOrder: number;
   capabilityTags: string[];
-  icon: "crm" | "automation" | "shield" | "calendar" | "custom";
+  icon: "crm" | "automation" | "shield" | "calendar" | "custom" | "mail";
+  iconUrl?: string | null;
   available: boolean;
 };
 
@@ -144,6 +147,35 @@ const catalog: IntegrationCatalogEntry[] = [
     available: true,
   },
   {
+    key: "gmail",
+    category: "mailboxes",
+    title: "Gmail",
+    shortValue: "Connect Gmail senders and workspace approvals on the sending page.",
+    enables: "OAuth mailbox connection, sender approval, campaign sends, and reply sync from Gmail or Google Workspace.",
+    customerRequirement: "Customer signs into Gmail or Google Workspace and grants mailbox permissions during OAuth.",
+    authType: "oauth",
+    sortOrder: 10,
+    detailOrder: 85,
+    capabilityTags: ["Mailbox connection", "Campaign sending", "Reply sync"],
+    icon: "mail",
+    available: true,
+  },
+  {
+    key: "outlook",
+    category: "mailboxes",
+    title: "Outlook",
+    shortValue: "Connect Microsoft 365 or Outlook senders with the same sender approval flow.",
+    enables: "OAuth mailbox connection, sender approval, campaign sends, and reply sync through Microsoft Graph.",
+    customerRequirement: "Customer signs into Outlook or Microsoft 365 and grants mailbox permissions during OAuth.",
+    authType: "oauth",
+    sortOrder: 20,
+    detailOrder: 86,
+    capabilityTags: ["Mailbox connection", "Campaign sending", "Reply sync"],
+    icon: "mail",
+    iconUrl: OUTLOOK_ICON_URL,
+    available: true,
+  },
+  {
     key: "calendly",
     category: "meetings",
     title: "Calendly",
@@ -189,6 +221,7 @@ export function listCatalogByCategory(options?: { includeUnavailable?: boolean }
       title: "Deliverability",
       entries: grouped.get("deliverability") ?? [],
     },
+    { key: "mailboxes" as const, title: "Mailboxes", entries: grouped.get("mailboxes") ?? [] },
     { key: "meetings" as const, title: "Meetings", entries: grouped.get("meetings") ?? [] },
   ];
 }

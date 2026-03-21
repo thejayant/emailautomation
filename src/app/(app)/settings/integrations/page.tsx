@@ -153,7 +153,7 @@ export default async function SettingsIntegrationsPage({
       <PageHeader
         eyebrow={workspace.workspaceName}
         title="Integrations"
-        description="Connect CRM sync, alerts, deliverability, and meeting workflows from one clean hub. Mailbox setup stays separate so this page remains focused and easy to manage."
+        description="Connect CRM sync, alerts, deliverability, mailbox discovery, and meeting workflows from one clean hub. Sender setup itself still stays on the sending page so this view remains focused and easy to manage."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href="/settings/sending">

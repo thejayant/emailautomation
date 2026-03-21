@@ -9,11 +9,13 @@ export type IntegrationProviderKey =
   | "slack"
   | "webhook"
   | "hunter"
+  | "gmail"
+  | "outlook"
   | "calendly";
 
 export type IntegrationCatalogAuthType = "oauth" | "api_key" | "webhook" | "managed_api_key";
 
-export type IntegrationCatalogIcon = "crm" | "automation" | "shield" | "calendar" | "custom";
+export type IntegrationCatalogIcon = "crm" | "automation" | "shield" | "calendar" | "custom" | "mail";
 
 export type IntegrationHubTileStatus = "available" | "connected" | "error" | "disconnected";
 
@@ -70,6 +72,7 @@ export type IntegrationHubTile = {
   detailOrder: number;
   capabilityTags: string[];
   icon: IntegrationCatalogIcon;
+  iconUrl?: string | null;
   available: boolean;
 };
 

@@ -5,7 +5,7 @@ import { buildCampaignWizardInitialValues } from "@/lib/campaigns/wizard-default
 import { getCachedContacts, getCachedTemplates } from "@/lib/cache/read-models";
 import { getWorkspaceContext } from "@/lib/db/workspace";
 import type { TemplateListItem } from "@/lib/templates/gallery";
-import { getWorkspaceGmailAccounts } from "@/services/gmail-service";
+import { getWorkspaceMailboxAccounts } from "@/services/mailbox-service";
 
 type NewCampaignPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -14,15 +14,19 @@ type NewCampaignPageProps = {
 export default async function NewCampaignPage({ searchParams }: NewCampaignPageProps) {
   const workspace = await getWorkspaceContext();
   const params = (await searchParams) ?? {};
-  const [rawGmailAccounts, rawContacts, rawTemplates] = await Promise.all([
-    getWorkspaceGmailAccounts(workspace.workspaceId, {
+  const [rawMailboxAccounts, rawContacts, rawTemplates] = await Promise.all([
+    getWorkspaceMailboxAccounts(workspace.workspaceId, {
       onlyApproved: true,
       projectId: workspace.activeProjectId,
     }),
     getCachedContacts(workspace.userId, workspace.workspaceId, workspace.activeProjectId),
     getCachedTemplates(workspace.userId, workspace.workspaceId, workspace.activeProjectId),
   ]);
-  const gmailAccounts = rawGmailAccounts as Array<{ id: string; email_address: string }>;
+  const mailboxAccounts = rawMailboxAccounts as Array<{
+    id: string;
+    email_address: string;
+    provider: "gmail" | "outlook";
+  }>;
   const contacts = rawContacts;
   const templates = rawTemplates as TemplateListItem[];
   const selectedTemplateId = typeof params.templateId === "string" ? params.templateId : null;
@@ -35,12 +39,12 @@ export default async function NewCampaignPage({ searchParams }: NewCampaignPageP
         description={productContent.campaigns.newCampaign.description}
       />
       <CampaignWizard
-        gmailAccounts={gmailAccounts}
+        mailboxAccounts={mailboxAccounts}
         contacts={contacts}
         templates={templates}
         initialSelectedTemplateId={selectedTemplateId ?? undefined}
         initialValues={buildCampaignWizardInitialValues({
-          gmailAccounts,
+          mailboxAccounts,
           contacts,
           templates,
           selectedTemplateId,

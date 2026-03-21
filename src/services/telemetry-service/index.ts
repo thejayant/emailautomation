@@ -45,6 +45,7 @@ export async function recordMessageEvent(input: {
   campaignContactId?: string | null;
   outboundMessageId?: string | null;
   gmailMessageId?: string | null;
+  providerMessageId?: string | null;
   eventType: "sent" | "opened" | "clicked" | "replied" | "unsubscribed" | "bounced" | "meeting_booked";
   metadata?: Record<string, unknown> | null;
 }) {
@@ -56,6 +57,7 @@ export async function recordMessageEvent(input: {
     campaign_contact_id: input.campaignContactId ?? null,
     outbound_message_id: input.outboundMessageId ?? null,
     gmail_message_id: input.gmailMessageId ?? null,
+    provider_message_id: input.providerMessageId ?? input.gmailMessageId ?? null,
     event_type: input.eventType,
     metadata: input.metadata ?? {},
   });

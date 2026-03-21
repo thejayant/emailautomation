@@ -23,7 +23,7 @@ export async function PUT(
       projectId: workspace.activeProjectId,
       campaignId,
       campaignName: payload.data.campaignName,
-      gmailAccountId: payload.data.gmailAccountId,
+      mailboxAccountId: payload.data.mailboxAccountId,
       targetContactIds: payload.data.targetContactIds,
       timezone: payload.data.timezone,
       sendWindowStart: payload.data.sendWindowStart,

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
 import {
@@ -11,6 +12,7 @@ import {
   ExternalLink,
   KeyRound,
   Link2,
+  Mail,
   RefreshCcw,
   ShieldCheck,
 } from "lucide-react";
@@ -139,12 +141,34 @@ function getProviderIcon(icon: IntegrationHubTile["icon"], className?: string) {
       return <ShieldCheck className={iconClassName} />;
     case "custom":
       return <KeyRound className={iconClassName} />;
+    case "mail":
+      return <Mail className={iconClassName} />;
     default:
       return <Cable className={iconClassName} />;
   }
 }
 
+function renderProviderIcon(tile: IntegrationHubTile, className?: string) {
+  if (tile.iconUrl) {
+    return (
+      <Image
+        src={tile.iconUrl}
+        alt=""
+        width={48}
+        height={48}
+        className={cn("size-5 rounded-sm", className)}
+      />
+    );
+  }
+
+  return getProviderIcon(tile.icon, className);
+}
+
 function getTileCtaLabel(tile: IntegrationHubTile) {
+  if (tile.category === "mailboxes") {
+    return "Open sending";
+  }
+
   if (tile.status === "connected") {
     return "Manage";
   }
@@ -361,6 +385,7 @@ function IntegrationDialog({
   const hunterVerifyOnImport = Boolean(firstLiveConnection?.config?.verifyOnImport);
   const hunterPreLaunchRule =
     firstLiveConnection?.config?.preLaunchRule === "block_invalid" ? "block_invalid" : "warn_only";
+  const isMailboxTile = tile.category === "mailboxes";
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
@@ -370,7 +395,7 @@ function IntegrationDialog({
             <DialogHeader className="gap-4 pr-14">
               <div className="flex flex-wrap items-start gap-4">
                 <span className="flex size-12 items-center justify-center rounded-[1.2rem] border border-white/74 bg-[rgba(230,242,247,0.9)] text-accent-foreground">
-                  {getProviderIcon(tile.icon)}
+                  {renderProviderIcon(tile)}
                 </span>
                 <div className="grid gap-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -401,19 +426,27 @@ function IntegrationDialog({
                         ? "CRM Sync"
                         : tile.category === "automation_alerts"
                           ? "Automation & Alerts"
-                          : tile.category === "deliverability"
+                        : tile.category === "deliverability"
                             ? "Deliverability"
+                            : tile.category === "mailboxes"
+                              ? "Mailboxes"
                             : "Meetings"
                     }
                   />
                   <ConnectionMeta
                     label="Connections"
                     value={
-                      liveConnections.length
-                        ? String(liveConnections.length)
-                        : previousConnections.length
-                          ? "Previously connected"
-                          : "Not connected yet"
+                      isMailboxTile
+                        ? tile.connectionCount
+                          ? String(tile.connectionCount)
+                          : tile.connectionSummary === "Previously connected"
+                            ? "Previously connected"
+                            : "Not connected yet"
+                        : liveConnections.length
+                          ? String(liveConnections.length)
+                          : previousConnections.length
+                            ? "Previously connected"
+                            : "Not connected yet"
                     }
                   />
                   <ConnectionMeta
@@ -441,6 +474,17 @@ function IntegrationDialog({
                     {firstLiveConnection.lastError ? (
                       <ConnectionMeta label="Attention" value={firstLiveConnection.lastError} />
                     ) : null}
+                  </div>
+                ) : isMailboxTile && tile.primaryHealth ? (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <ConnectionMeta
+                      label="Health"
+                      value={tile.primaryHealth === "healthy" ? "Healthy" : "Needs attention"}
+                    />
+                    <ConnectionMeta
+                      label="Mailbox state"
+                      value={tile.connectionSummary ?? "Not connected yet"}
+                    />
                   </div>
                 ) : null}
               </FormSection>
@@ -473,6 +517,11 @@ function IntegrationDialog({
                     sending page by design.
                   </p>
                 ) : null}
+                {isMailboxTile ? (
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Gmail and Outlook appear here for discovery, but the actual sender connection, approval, and disconnect flow stays on the sending page.
+                  </p>
+                ) : null}
               </FormSection>
 
               <FormSection
@@ -487,6 +536,17 @@ function IntegrationDialog({
 
                 {canManage && (
                   <div className="grid gap-4">
+                    {isMailboxTile ? (
+                      <DialogFooter className="justify-end">
+                        <Button asChild>
+                          <Link href="/settings/sending">
+                            Open sending setup
+                            <Link2 className="size-4" />
+                          </Link>
+                        </Button>
+                      </DialogFooter>
+                    ) : null}
+
                     {(tile.provider === "hubspot" ||
                       tile.provider === "salesforce" ||
                       tile.provider === "pipedrive" ||
@@ -872,7 +932,7 @@ export function IntegrationsHub({ canManage, data, initialProvider = null }: Int
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="flex size-10 items-center justify-center rounded-[1rem] border border-white/72 bg-[rgba(230,242,247,0.9)] text-accent-foreground">
-                          {getProviderIcon(tile?.icon ?? "crm", "size-4")}
+                          {tile ? renderProviderIcon(tile, "size-4") : getProviderIcon("crm", "size-4")}
                         </span>
                         <span className="text-sm font-semibold text-foreground">{item.title}</span>
                         <Badge variant="neutral">{item.categoryTitle}</Badge>
@@ -1021,6 +1081,8 @@ export function IntegrationsHub({ canManage, data, initialProvider = null }: Int
                         ? "Alerts and downstream automation routes."
                         : category.key === "deliverability"
                           ? "Verification and send quality controls."
+                          : category.key === "mailboxes"
+                            ? "Mailbox providers that route into sender setup."
                           : "Meeting signals that improve workflow exits."}
                   </p>
                 </div>
@@ -1038,7 +1100,7 @@ export function IntegrationsHub({ canManage, data, initialProvider = null }: Int
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
                         <span className="flex size-11 items-center justify-center rounded-[1.05rem] border border-white/72 bg-[rgba(230,242,247,0.9)] text-accent-foreground">
-                          {getProviderIcon(tile.icon)}
+                          {renderProviderIcon(tile)}
                         </span>
                         <div className="grid gap-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1132,7 +1194,7 @@ export function IntegrationsHub({ canManage, data, initialProvider = null }: Int
           <div className="grid gap-1">
             <p className="text-base font-semibold tracking-[-0.03em] text-foreground">Mailbox setup lives on the sending page</p>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              Connect and approve Gmail accounts there. This separation keeps `/settings/integrations` focused on CRM, alerts, deliverability, and meeting signals.
+              Connect and approve Gmail or Outlook senders there. This page shows mailbox discovery too, but operational sender setup still lives under sending.
             </p>
           </div>
           <Button asChild>
