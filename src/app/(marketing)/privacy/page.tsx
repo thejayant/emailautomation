@@ -43,15 +43,15 @@ const sections: LegalSection[] = [
     id: "overview",
     title: "1. Scope and service identity",
     paragraphs: [
-      "This Privacy Policy explains how OutboundFlow handles personal information when you access or use the OutboundFlow application and public website located at https://outbound-flow.vercel.app/. In this policy, \"OutboundFlow,\" \"we,\" \"our,\" and \"us\" refer to the operator of the OutboundFlow service.",
-      "This policy is intended to support public-facing product use, Google Auth Platform verification, and Microsoft Entra branding and consent verification. It applies to information collected on the public site, inside the product, and through connected services such as Google Workspace Gmail and Microsoft 365 Outlook.",
+      "This Privacy Policy explains how OutboundFlow handles personal information when you access or use the OutboundFlow application and public website located at https://outbound-flow.vercel.app/. In this policy, \"OutboundFlow,\" \"we,\" \"our,\" and \"us\" refer to the OutboundFlow service and the service operator responsible for providing it, where applicable.",
+      "This policy is intended to support public-facing product use, Google Auth Platform verification, and Microsoft Entra branding and consent verification. It applies to information collected on the public site, within the product, and through connected services such as Google Workspace Gmail and Microsoft 365 Outlook.",
     ],
   },
   {
     id: "collect",
     title: "2. Information we collect",
     paragraphs: [
-      "We collect and process information needed to operate the service, authenticate users, run outbound campaigns, sync replies, and secure the product. The information we collect depends on how you use OutboundFlow and which integrations you connect.",
+      "We collect and process information needed to operate the service, authenticate users, run outbound campaigns, synchronize replies, and secure the product. The information we collect depends on how you use OutboundFlow and which integrations you connect.",
     ],
     bullets: [
       "Account and workspace data, such as your name, email address, role, workspace membership, and account authentication records.",
@@ -64,7 +64,7 @@ const sections: LegalSection[] = [
     id: "use",
     title: "3. How we use information",
     paragraphs: [
-      "We use personal information to provide, maintain, secure, and improve the user-facing functionality of OutboundFlow. That includes creating workspaces, authenticating users, connecting mailboxes, sending outreach, syncing replies, suppressing follow-ups after a response, updating campaign analytics, and troubleshooting product issues.",
+      "We use personal information to provide, maintain, secure, and improve the user-facing functionality of OutboundFlow. That includes creating workspaces, authenticating users, connecting mailboxes, sending outreach, synchronizing replies, suppressing follow-ups after a response, updating campaign analytics, and troubleshooting product issues.",
       "We may also use information to prevent abuse, investigate security incidents, comply with law, enforce our Terms and Conditions, and communicate operational notices related to your use of the service.",
     ],
   },
@@ -73,13 +73,13 @@ const sections: LegalSection[] = [
     title: "4. Google user data and Gmail permissions",
     paragraphs: [
       "When you connect a Google account, OutboundFlow requests the Gmail scopes https://www.googleapis.com/auth/gmail.send, https://www.googleapis.com/auth/gmail.readonly, and https://www.googleapis.com/auth/gmail.modify. We also use the Gmail profile endpoint to identify the connected mailbox email address.",
-      "We use Gmail data only to provide or improve the user-facing features of OutboundFlow. In practical terms, that means connecting a mailbox, sending campaign emails or manual replies, reading thread and message data to sync replies back into the workspace, updating campaign state when a recipient replies, and showing the team accurate inbox and thread history inside the product.",
+      "We use Gmail data only to provide or improve the user-facing features of OutboundFlow. In practical terms, that means connecting a mailbox, sending campaign emails or manual replies, reading thread and message data to synchronize replies back into the workspace, updating campaign state when a recipient replies, and showing the team accurate inbox and thread history inside the product.",
       "OutboundFlow's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. We do not sell Google user data, use Google user data for targeted advertising, or use Google Workspace API data to develop, improve, or train generalized or non-personalized AI or machine learning models.",
     ],
     bullets: [
       "Google user data is accessed only after you authorize the mailbox connection.",
       "Google OAuth credentials are stored in encrypted form.",
-      "Google mailbox content is processed so the service can send messages, sync threads, classify replies, and keep campaign records accurate.",
+      "Google mailbox content is processed so the service can send messages, synchronize threads, classify replies, and keep campaign records accurate.",
       "If you revoke Google's access to the app or disconnect the mailbox, future Google API access stops once valid credentials are no longer available to the service.",
     ],
   },
@@ -88,7 +88,7 @@ const sections: LegalSection[] = [
     title: "5. Microsoft user data and Outlook permissions",
     paragraphs: [
       "When you connect a Microsoft account, OutboundFlow requests the scopes openid, profile, email, offline_access, User.Read, Mail.Send, and Mail.ReadWrite through the Microsoft identity platform and Microsoft Graph.",
-      "We use Microsoft data to identify the connected mailbox, send email, create or continue reply threads, sync inbox activity back into OutboundFlow, update campaign and inbox records, and display workspace-visible thread history. We do not access Microsoft mailbox data for unrelated analytics, advertising, resale, or profiling outside the product features a user has asked us to provide.",
+      "We use Microsoft data to identify the connected mailbox, send email, create or continue reply threads, synchronize inbox activity back into OutboundFlow, update campaign and inbox records, and display workspace-visible thread history. We do not access Microsoft mailbox data for unrelated analytics, advertising, resale, or profiling outside the product features a user has asked us to provide.",
     ],
     bullets: [
       "Microsoft account profile data is used to identify the mailbox owner and connected mailbox address.",
@@ -123,7 +123,7 @@ const sections: LegalSection[] = [
     paragraphs: [
       "We retain personal information for as long as it is needed to provide the service, maintain workspace history, enforce agreements, resolve disputes, comply with legal obligations, and protect the security and integrity of OutboundFlow.",
       "Campaign, contact, inbox, and workspace records may remain available until they are deleted by the workspace or removed during account closure or administrative cleanup. OAuth credentials remain stored only while a mailbox connection is maintained and are removed when no longer needed, revoked, or deleted as part of account or integration cleanup.",
-      "If you want mailbox access to stop immediately, you can disconnect the mailbox in the product or revoke the app's access from your Google or Microsoft account settings. If you need a deletion request handled at the service level, please work through the workspace administrator or the service operator for this deployment.",
+      "If you want mailbox access to stop immediately, you can disconnect the mailbox in the product or revoke the app's access from your Google or Microsoft account settings. If you need a deletion request handled at the service level, you may contact OutboundFlow using the details provided below.",
     ],
   },
   {
@@ -145,7 +145,8 @@ const sections: LegalSection[] = [
     id: "contact",
     title: "11. Privacy requests and contact",
     paragraphs: [
-      "If you need to make a privacy, access, correction, or deletion request relating to this deployment of OutboundFlow, please contact the workspace administrator or the service operator who granted you access to the app. If you are the operator of this deployment, you are responsible for receiving and processing user requests relating to the data you control through the service.",
+      "If you need to submit a privacy, access, correction, deletion, or verification-related request, you may contact OutboundFlow at solankijay01@gmail.com. This contact channel may be used for Google Auth Platform verification, Microsoft Entra review, and user privacy inquiries relating to the public OutboundFlow service at https://outbound-flow.vercel.app/.",
+      "If you use OutboundFlow through an employer, client, or private workspace, that organization may control some of the information processed within the service and may need to review or coordinate your request before it can be completed.",
     ],
   },
 ];
@@ -187,6 +188,9 @@ export default function PrivacyPage() {
             </span>
             <span className="rounded-full border border-[#ead7e3] bg-white/80 px-4 py-2">
               Applicable domain: outbound-flow.vercel.app
+            </span>
+            <span className="rounded-full border border-[#ead7e3] bg-white/80 px-4 py-2">
+              Contact: <a href="mailto:solankijay01@gmail.com" className="font-medium text-[#b4236d]">solankijay01@gmail.com</a>
             </span>
             <span className="rounded-full border border-[#ead7e3] bg-white/80 px-4 py-2">
               Related page: <Link href="/terms" className="font-medium text-[#b4236d]">Terms &amp; Conditions</Link>

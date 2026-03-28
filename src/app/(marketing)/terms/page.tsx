@@ -43,7 +43,7 @@ const sections: LegalSection[] = [
     id: "agreement",
     title: "1. Agreement to these terms",
     paragraphs: [
-      "These Terms and Conditions govern your access to and use of the OutboundFlow website and application located at https://outbound-flow.vercel.app/. By accessing the service, creating an account, connecting a mailbox, or using any product feature, you agree to these terms.",
+      "These Terms & Conditions govern your access to and use of the OutboundFlow website and application located at https://outbound-flow.vercel.app/. By accessing the service, creating an account, connecting a mailbox, or using any product feature, you agree to these terms.",
       "If you are using OutboundFlow on behalf of a business, employer, client, or other organization, you represent that you are authorized to bind that organization to these terms and that \"you\" includes that organization.",
     ],
   },
@@ -51,7 +51,7 @@ const sections: LegalSection[] = [
     id: "service",
     title: "2. Service description",
     paragraphs: [
-      "OutboundFlow is an outbound campaign and inbox workspace that helps teams manage contacts, create and send email sequences, connect supported mailboxes, sync replies, and keep campaign activity visible in one place.",
+      "OutboundFlow is an outbound campaign and inbox workspace that helps teams manage contacts, create and send email sequences, connect supported mailboxes, synchronize replies, and keep campaign activity visible in one place.",
       "Features may evolve over time and may include campaign management, shared inbox views, mailbox connection management, analytics, imports, integrations, automation, and operational tooling for outbound workflows.",
     ],
   },
@@ -81,7 +81,7 @@ const sections: LegalSection[] = [
     title: "5. Third-party integrations and platform rules",
     paragraphs: [
       "OutboundFlow may connect to third-party services, including Google Workspace Gmail, Microsoft 365 Outlook, CRMs, calendars, sheets, and webhook endpoints. Your use of those services remains subject to the third party's own terms, privacy notices, and API rules.",
-      "You authorize OutboundFlow to access and process the integration data needed to provide the product features you enable. You are responsible for maintaining any required permissions, domain approvals, or internal authorizations for those integrations.",
+      "You authorize OutboundFlow to access and process the integration data needed to provide the product features you enable. You are responsible for maintaining any required permissions, domain approvals, internal authorizations, and lawful instructions for those integrations.",
     ],
   },
   {
@@ -134,7 +134,8 @@ const sections: LegalSection[] = [
     id: "contact",
     title: "12. Questions about these terms",
     paragraphs: [
-      "If you have a question about these terms, please contact the workspace administrator or the service operator responsible for this OutboundFlow deployment before using the service in a way that could create legal or compliance risk for your organization.",
+      "If you have a question about these Terms & Conditions or need to make a verification-related inquiry, you may contact OutboundFlow at solankijay01@gmail.com.",
+      "If you use OutboundFlow through an employer, client, or private workspace, that organization may need to review legal or compliance questions relating to your use of the service before action is taken.",
     ],
   },
 ];
@@ -172,6 +173,9 @@ export default function TermsPage() {
           <div className="mt-6 flex flex-wrap gap-3 text-sm text-[#5f5975]">
             <span className="rounded-full border border-[#ead7e3] bg-white/80 px-4 py-2">
               Effective date: {effectiveDate}
+            </span>
+            <span className="rounded-full border border-[#ead7e3] bg-white/80 px-4 py-2">
+              Contact: <a href="mailto:solankijay01@gmail.com" className="font-medium text-[#b4236d]">solankijay01@gmail.com</a>
             </span>
             <span className="rounded-full border border-[#ead7e3] bg-white/80 px-4 py-2">
               Related page: <Link href="/privacy" className="font-medium text-[#b4236d]">Privacy Policy</Link>

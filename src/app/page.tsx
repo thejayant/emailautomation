@@ -455,6 +455,9 @@ export default async function HomePage() {
             <Link href="/terms" className="transition hover:text-[#b4236d]">
               Terms &amp; Conditions
             </Link>
+            <Link href="/contact" className="transition hover:text-[#b4236d]">
+              Contact
+            </Link>
             <p>Built by the Cibirix SEO team</p>
           </HydrationSafeDiv>
         </HydrationSafeDiv>
