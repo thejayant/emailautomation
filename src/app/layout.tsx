@@ -18,6 +18,9 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: marketingContent.meta.title,
   description: marketingContent.meta.description,
+  verification: {
+    google: "wxD-IKknrYjIv5dYQSxE4FIcY81TR5bOfzfzwVnjoNA",
+  },
   icons: {
     icon: "/brand/favicon.png",
     apple: "/brand/favicon.png",
