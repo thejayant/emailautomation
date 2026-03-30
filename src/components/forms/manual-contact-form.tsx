@@ -145,7 +145,7 @@ export function ManualContactForm({
   );
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden" data-tour="contacts-manual-form">
       <CardHeader className="gap-4 border-b border-white/56 bg-white/32">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">

@@ -885,7 +885,7 @@ export function IntegrationsHub({ canManage, data, initialProvider = null }: Int
   );
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6" data-tour="integrations-hub">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OverviewCard
           label="Connected"

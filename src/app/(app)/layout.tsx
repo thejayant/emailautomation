@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { AppShell } from "@/components/layout/app-shell";
+import { WalkthroughProvider } from "@/components/walkthrough/walkthrough-provider";
 import { getWorkspaceContext } from "@/lib/db/workspace";
+import { getUserProductTourState } from "@/lib/profile/product-tour";
 import { requireSupabaseConfiguration } from "@/lib/supabase/env";
 
 export default async function ProtectedAppLayout({
@@ -30,14 +32,18 @@ export default async function ProtectedAppLayout({
     throw new Error(message);
   }
 
+  const productTourState = await getUserProductTourState(workspace.userId);
+
   return (
-    <AppShell
-      activeProjectId={workspace.activeProjectId}
-      projects={workspace.availableProjects}
-      shellTitle={workspace.workspaceLabel}
-      workspaceName={workspace.workspaceName}
-    >
-      {children}
-    </AppShell>
+    <WalkthroughProvider initialProductTourVersion={productTourState.version}>
+      <AppShell
+        activeProjectId={workspace.activeProjectId}
+        projects={workspace.availableProjects}
+        shellTitle={workspace.workspaceLabel}
+        workspaceName={workspace.workspaceName}
+      >
+        {children}
+      </AppShell>
+    </WalkthroughProvider>
   );
 }

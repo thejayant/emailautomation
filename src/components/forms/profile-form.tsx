@@ -47,7 +47,7 @@ export function ProfileForm({
   });
 
   return (
-    <Card>
+    <Card data-tour="profile-form">
       <CardHeader>
         <CardTitle>{productContent.profile.form.title}</CardTitle>
       </CardHeader>

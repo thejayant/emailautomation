@@ -118,7 +118,7 @@ export function AppShell({
             />
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4" data-tour="sidebar-nav">
             <SidebarNav orientation="horizontal" />
           </div>
         </div>
@@ -155,6 +155,7 @@ export function AppShell({
 
               <button
                 type="button"
+                data-tour="sidebar-collapse"
                 aria-pressed={isDesktopSidebarCollapsed}
                 aria-label={isDesktopSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 onClick={() => setSidebarCollapsed(!isDesktopSidebarCollapsed)}
@@ -189,7 +190,9 @@ export function AppShell({
                   compact={isDesktopSidebarCollapsed}
                 />
               </div>
-              <SidebarNav collapsed={isDesktopSidebarCollapsed} />
+              <div data-tour="sidebar-nav">
+                <SidebarNav collapsed={isDesktopSidebarCollapsed} />
+              </div>
             </div>
 
             {isDesktopSidebarCollapsed ? (
@@ -254,7 +257,10 @@ export function AppShell({
           </div>
         </aside>
 
-        <main className="solid-content relative min-w-0 overflow-hidden rounded-[34px] p-4 sm:p-6 xl:p-8">
+        <main
+          className="solid-content relative min-w-0 overflow-hidden rounded-[34px] p-4 sm:p-6 xl:p-8"
+          data-tour="app-main"
+        >
           {children}
         </main>
       </div>

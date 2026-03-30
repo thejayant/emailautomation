@@ -157,7 +157,7 @@ export default async function ProjectsSettingsPage({ searchParams }: ProjectsSet
         </CardContent>
       </Card>
 
-      <section className="grid gap-4">
+      <section className="grid gap-4" data-tour="projects-manage">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">Manage projects</h2>

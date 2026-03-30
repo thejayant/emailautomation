@@ -38,7 +38,7 @@ export default async function DashboardPage() {
   }));
 
   return (
-    <div className="grid gap-8">
+    <div className="grid gap-8" data-tour="dashboard-main">
       <PageHeader
         eyebrow={workspace.workspaceName}
         title={productContent.dashboard.title}

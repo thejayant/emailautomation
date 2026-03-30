@@ -65,7 +65,7 @@ export function WelcomeForm({
       }
 
       toast.success(productContent.auth.welcome.successMessage);
-      window.location.assign("/dashboard");
+      window.location.assign("/dashboard?tour=workspace");
     });
   });
 

@@ -68,6 +68,7 @@ export function ProjectSwitcher({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-tour="project-switcher"
           aria-label="Active project"
           disabled={isPending}
           className={cn(

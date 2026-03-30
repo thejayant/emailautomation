@@ -112,7 +112,7 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6" data-tour="imports-panel">
       <form onSubmit={handleFileSubmit} className="grid gap-4">
         <input
           ref={fileInputRef}

@@ -30,7 +30,7 @@ export default async function CampaignsPage() {
         title={productContent.campaigns.header.title}
         description={productContent.campaigns.header.description}
         actions={
-          <Button asChild>
+          <Button asChild data-tour="campaigns-new-button">
             <Link href="/campaigns/new">{productContent.campaigns.header.ctaLabel}</Link>
           </Button>
         }

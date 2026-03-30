@@ -112,7 +112,7 @@ export default async function SettingsPage() {
         </div>
       ) : null}
 
-      <Card>
+      <Card data-tour="settings-checklist">
         <CardHeader className="gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">

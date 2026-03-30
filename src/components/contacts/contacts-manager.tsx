@@ -311,7 +311,7 @@ export function ContactsManager({ initialContacts, initialTags }: ContactsManage
 
   return (
     <div className="grid gap-6">
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden" data-tour="contacts-controls">
         <CardContent className="p-5 sm:p-6">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="grid gap-5">
@@ -407,7 +407,7 @@ export function ContactsManager({ initialContacts, initialTags }: ContactsManage
         />
       ) : null}
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden" data-tour="contacts-table">
         <CardHeader className="flex flex-col gap-3 border-b border-white/56 bg-white/32 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <CardTitle className="text-[1.7rem] tracking-[-0.05em]">{productContent.contacts.table.title}</CardTitle>

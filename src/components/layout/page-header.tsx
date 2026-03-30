@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { WalkthroughTrigger } from "@/components/walkthrough/walkthrough-trigger";
 
 type PageHeaderProps = {
   eyebrow?: string;
@@ -9,7 +10,10 @@ type PageHeaderProps = {
 
 export function PageHeader({ eyebrow, title, description, actions }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div
+      className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"
+      data-tour="page-header-root"
+    >
       <div className="min-w-0 space-y-4">
         {eyebrow ? (
           <div className="glass-chip inline-flex w-fit items-center rounded-full px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
@@ -27,7 +31,10 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
           ) : null}
         </div>
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-3 lg:justify-end">{actions}</div> : null}
+      <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+        <WalkthroughTrigger />
+        {actions}
+      </div>
     </div>
   );
 }

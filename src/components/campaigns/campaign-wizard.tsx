@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useDeferredValue, useId, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useDeferredValue, useEffect, useId, useMemo, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
@@ -96,6 +96,7 @@ export function CampaignWizard({
   initialSelectedTemplateId,
 }: WizardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const resolvedInitialValues = useMemo(() => {
     const baseValues =
       initialValues ??
@@ -244,6 +245,26 @@ export function CampaignWizard({
   const reviewReady = checklist.every((item) => item.complete);
   const sendWindowSummary = formatSendWindowSummary(timezone, sendWindowStart, sendWindowEnd);
   const sendWindowPresetId = getSendWindowPresetId(sendWindowStart, sendWindowEnd);
+
+  useEffect(() => {
+    const tourFocus = searchParams.get("tourFocus");
+
+    if (!tourFocus) {
+      return;
+    }
+
+    const nextIndex = campaignCreatorSteps.findIndex((step) => step.id === tourFocus);
+
+    if (nextIndex >= 0 && nextIndex !== currentStepIndex) {
+      const frameId = window.requestAnimationFrame(() => {
+        setCurrentStepIndex(nextIndex);
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frameId);
+      };
+    }
+  }, [currentStepIndex, searchParams]);
 
   function openTemplateDialog(
     intent: CampaignTemplateIntent,
@@ -507,12 +528,12 @@ export function CampaignWizard({
                     {starterType === "template" && selectedPrimaryTemplate ? <div className="rounded-[1.6rem] border border-white/70 bg-white/54 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="grid gap-1"><p className="text-base font-semibold text-foreground">{selectedPrimaryTemplate.name}</p><p className="text-sm text-muted-foreground">{selectedPrimaryTemplate.subject_template}</p></div><Button type="button" variant="outline" size="sm" onClick={() => openTemplateDialog("primary", 0, creatorCopy.start.templateDialogTitle, creatorCopy.start.templateDialogDescription)}>Browse templates</Button></div><p className="mt-3 text-sm leading-6 text-muted-foreground">{getTemplateSnippet(selectedPrimaryTemplate)}</p></div> : null}
                     <div className="grid gap-4 lg:grid-cols-2">
                       <div className="grid gap-2"><Label htmlFor="campaignName">{creatorCopy.start.campaignNameLabel}</Label><Input id="campaignName" placeholder={creatorCopy.start.campaignNamePlaceholder} {...form.register("campaignName")} /><FieldError message={typeof form.formState.errors.campaignName?.message === "string" ? form.formState.errors.campaignName.message : undefined} /></div>
-                      <div className="grid gap-2"><Label htmlFor="mailboxAccountId">{creatorCopy.start.senderLabel}</Label><LiquidSelect id="mailboxAccountId" ariaLabel={creatorCopy.start.senderLabel} value={mailboxAccountId} onValueChange={(value) => form.setValue("mailboxAccountId", value, { shouldDirty: true, shouldValidate: true })} disabled={!hasMailbox} placeholder={creatorCopy.start.senderEmptyLabel} triggerClassName="h-12 rounded-[1.15rem]" options={mailboxAccounts.map((account) => ({ value: account.id, label: account.email_address, description: `${account.provider === "outlook" ? "Outlook" : "Gmail"} approved sender mailbox` }))} /><FieldError message={typeof form.formState.errors.mailboxAccountId?.message === "string" ? form.formState.errors.mailboxAccountId.message : undefined} />{!hasMailbox ? <div className="rounded-[1.45rem] border border-white/70 bg-white/54 p-4"><p className="font-semibold text-foreground">{creatorCopy.start.senderHelperTitle}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{creatorCopy.start.senderHelperBody}</p><div className="mt-3"><Button asChild variant="outline" size="sm"><Link href="/settings/sending">{creatorCopy.start.senderHelperCta}</Link></Button></div></div> : null}</div>
+                      <div className="grid gap-2" data-tour="campaign-builder-sender"><Label htmlFor="mailboxAccountId">{creatorCopy.start.senderLabel}</Label><LiquidSelect id="mailboxAccountId" ariaLabel={creatorCopy.start.senderLabel} value={mailboxAccountId} onValueChange={(value) => form.setValue("mailboxAccountId", value, { shouldDirty: true, shouldValidate: true })} disabled={!hasMailbox} placeholder={creatorCopy.start.senderEmptyLabel} triggerClassName="h-12 rounded-[1.15rem]" options={mailboxAccounts.map((account) => ({ value: account.id, label: account.email_address, description: `${account.provider === "outlook" ? "Outlook" : "Gmail"} approved sender mailbox` }))} /><FieldError message={typeof form.formState.errors.mailboxAccountId?.message === "string" ? form.formState.errors.mailboxAccountId.message : undefined} />{!hasMailbox ? <div className="rounded-[1.45rem] border border-white/70 bg-white/54 p-4"><p className="font-semibold text-foreground">{creatorCopy.start.senderHelperTitle}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{creatorCopy.start.senderHelperBody}</p><div className="mt-3"><Button asChild variant="outline" size="sm"><Link href="/settings/sending">{creatorCopy.start.senderHelperCta}</Link></Button></div></div> : null}</div>
                     </div>
                   </div>
                 ) : null}
                 {activeStep.id === "audience" ? (
-                  <div className="grid gap-5">
+                  <div className="grid gap-5" data-tour="campaign-builder-audience">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <Badge variant={targetContactIds.length ? "success" : "warning"}>
                         <Users className="size-4" />
@@ -539,7 +560,7 @@ export function CampaignWizard({
                   </div>
                 ) : null}
                 {activeStep.id === "message" ? (
-                  <div className="grid gap-5">
+                  <div className="grid gap-5" data-tour="campaign-builder-message">
                     <CampaignMessageCard form={form} index={0} label={creatorCopy.message.primaryLabel} description={creatorCopy.message.primaryDescription} previewContact={previewContact} sendDelayLabel={creatorCopy.message.sendImmediately} templateName={selectedPrimaryTemplate?.name ?? null} onOpenTemplateChooser={() => openTemplateDialog("primary", 0, "Choose the first email template", "Pick the opening email that should preload Email 1. You can still edit every line before launch.")} />
                     <CampaignMessageCard form={form} index={1} label={creatorCopy.message.followUpLabel} description={creatorCopy.message.followUpDescription} previewContact={previewContact} sendDelayLabel={creatorCopy.message.sendAfter(Number(primaryStep?.waitDays ?? 0))} templateName={selectedFollowUpTemplate?.name ?? null} onOpenTemplateChooser={() => openTemplateDialog("follow-up", 1, "Choose the follow-up template", "Pick the follow-up email that should send after the opener. This list only shows follow-up templates.")} />
                     <div className="rounded-[1.75rem] border border-white/65 bg-white/44 p-5">
@@ -558,7 +579,7 @@ export function CampaignWizard({
                   </div>
                 ) : null}
                 {activeStep.id === "review" ? (
-                  <div className="grid gap-6">
+                  <div className="grid gap-6" data-tour="campaign-builder-launch">
                     <div className="grid gap-4 lg:grid-cols-2">
                       <div className="grid gap-4 rounded-[1.75rem] border border-white/65 bg-white/52 p-5">
                         <div className="space-y-1">

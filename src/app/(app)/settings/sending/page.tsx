@@ -158,7 +158,7 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <Card>
+        <Card data-tour="sending-connect">
           <CardHeader className="gap-3">
             <div className="flex items-center gap-3">
               <span className="flex size-11 items-center justify-center rounded-[1.1rem] border border-white/74 bg-[rgba(215,237,247,0.84)] text-accent-foreground">
@@ -265,7 +265,7 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="sending-identities">
           <CardHeader className="gap-3">
             <div className="flex items-center gap-3">
               <span className="flex size-11 items-center justify-center rounded-[1.1rem] border border-white/74 bg-white/84 text-foreground">
@@ -330,7 +330,7 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
         </Card>
       </div>
 
-      <Card>
+      <Card data-tour="sending-approvals">
         <CardHeader className="gap-3">
           <div className="flex items-center gap-3">
             <span className="flex size-11 items-center justify-center rounded-[1.1rem] border border-white/74 bg-white/84 text-foreground">
@@ -394,7 +394,7 @@ export default async function SettingsSendingPage({ searchParams }: SendingPageP
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="sending-registry">
         <CardHeader className="gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
