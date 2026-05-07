@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button, type ButtonProps } from "@/components/ui/button";
+import { invalidateAppData } from "@/lib/app-data/client";
 
 type DeleteCampaignButtonProps = {
   campaignId: string;
@@ -35,6 +36,7 @@ export function DeleteCampaignButton({
       }
 
       toast.success("Campaign deleted");
+      invalidateAppData("campaigns");
       router.push(redirectTo);
       router.refresh();
     });

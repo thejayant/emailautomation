@@ -27,6 +27,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 import { productContent } from "@/content/product";
+import { invalidateAppData } from "@/lib/app-data/client";
 import { cn } from "@/lib/utils";
 import { stripHtmlToText } from "@/lib/utils/html";
 import {
@@ -398,6 +399,7 @@ export function TemplateForm({
       setIsAutoDetectedHtml(false);
       setActiveTab("write");
       setPreviewViewport("desktop");
+      invalidateAppData("templates");
       router.refresh();
       toast.success(formCopy.successMessage);
       onSaved?.();

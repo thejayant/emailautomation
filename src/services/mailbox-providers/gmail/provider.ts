@@ -1,4 +1,3 @@
-import { google } from "googleapis";
 import { randomUUID } from "crypto";
 import { env } from "@/lib/supabase/env";
 import { normalizeEmailHtmlDocument } from "@/lib/utils/html";
@@ -11,12 +10,16 @@ import {
   type SyncThreadsInput,
 } from "@/services/mailbox-providers/types";
 
-function createOAuthClient() {
+async function createGmailClient(accessToken: string) {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
     throw new Error("Google OAuth is not configured.");
   }
 
-  return new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+  const { google } = await import("googleapis");
+  const auth = new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+  auth.setCredentials({ access_token: accessToken });
+
+  return google.gmail({ version: "v1", auth });
 }
 
 function decodeBody(data?: string | null) {
@@ -62,9 +65,7 @@ function buildMimeMessage(input: SendMessageInput) {
 
 export class GmailMailboxProvider implements MailboxProvider {
   async sendMessage(input: SendMessageInput) {
-    const auth = createOAuthClient();
-    auth.setCredentials({ access_token: input.accessToken });
-    const gmail = google.gmail({ version: "v1", auth });
+    const gmail = await createGmailClient(input.accessToken);
     const response = await gmail.users.messages.send({
       userId: "me",
       requestBody: {
@@ -85,9 +86,7 @@ export class GmailMailboxProvider implements MailboxProvider {
   }
 
   async syncThreads(input: SyncThreadsInput): Promise<SyncResult> {
-    const auth = createOAuthClient();
-    auth.setCredentials({ access_token: input.accessToken });
-    const gmail = google.gmail({ version: "v1", auth });
+    const gmail = await createGmailClient(input.accessToken);
     const listResponse = await gmail.users.threads.list({
       userId: "me",
       q: "newer_than:7d",

@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
-import { connection } from "next/server";
+import { AppDataProvider } from "@/components/app-data/app-data-provider";
+import { InstantAppContent } from "@/components/app-data/instant-app-content";
 import { AppShell } from "@/components/layout/app-shell";
 import { WalkthroughProvider } from "@/components/walkthrough/walkthrough-provider";
 import { getWorkspaceContext } from "@/lib/db/workspace";
-import { getUserProductTourState } from "@/lib/profile/product-tour";
 import { requireSupabaseConfiguration } from "@/lib/supabase/env";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProtectedAppLayout({
   children,
@@ -12,7 +14,6 @@ export default async function ProtectedAppLayout({
   children: React.ReactNode;
 }) {
   requireSupabaseConfiguration();
-  await connection();
   let workspace: Awaited<ReturnType<typeof getWorkspaceContext>>;
 
   try {
@@ -32,18 +33,18 @@ export default async function ProtectedAppLayout({
     throw new Error(message);
   }
 
-  const productTourState = await getUserProductTourState(workspace.userId);
-
   return (
-    <WalkthroughProvider initialProductTourVersion={productTourState.version}>
-      <AppShell
-        activeProjectId={workspace.activeProjectId}
-        projects={workspace.availableProjects}
-        shellTitle={workspace.workspaceLabel}
-        workspaceName={workspace.workspaceName}
-      >
-        {children}
-      </AppShell>
-    </WalkthroughProvider>
+    <AppDataProvider workspace={workspace}>
+      <WalkthroughProvider initialProductTourVersion={null}>
+        <AppShell
+          activeProjectId={workspace.activeProjectId}
+          projects={workspace.availableProjects}
+          shellTitle={workspace.workspaceLabel}
+          workspaceName={workspace.workspaceName}
+        >
+          <InstantAppContent>{children}</InstantAppContent>
+        </AppShell>
+      </WalkthroughProvider>
+    </AppDataProvider>
   );
 }

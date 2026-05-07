@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 import { productContent } from "@/content/product";
+import { invalidateAppData } from "@/lib/app-data/client";
 import type { ContactRecord, ContactTag } from "@/lib/types/contact";
 import { contactUpdateSchema } from "@/lib/zod/schemas";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +83,7 @@ function ContactEditForm({
       }
 
       toast.success(productContent.contacts.editor.updateSuccess);
+      invalidateAppData("contacts");
       onSaved(payload.contact as ContactRecord);
     });
   });
@@ -241,6 +243,7 @@ export function ContactsManager({ initialContacts, initialTags }: ContactsManage
         return;
       }
 
+      invalidateAppData("contacts");
       router.refresh();
       toast.success(
         operation === "add"
@@ -278,6 +281,7 @@ export function ContactsManager({ initialContacts, initialTags }: ContactsManage
 
       setSelectedIds([]);
       setEditingContactId(null);
+      invalidateAppData("contacts");
       router.refresh();
       toast.success(productContent.contacts.controls.deleteSelectedSuccess);
     });
@@ -305,6 +309,7 @@ export function ContactsManager({ initialContacts, initialTags }: ContactsManage
         setEditingContactId(null);
       }
       toast.success(productContent.contacts.table.deleteSuccess);
+      invalidateAppData("contacts");
       router.refresh();
     });
   }
@@ -402,6 +407,7 @@ export function ContactsManager({ initialContacts, initialTags }: ContactsManage
           onSaved={(contact) => {
             syncContact(contact);
             setEditingContactId(null);
+            invalidateAppData("contacts");
             router.refresh();
           }}
         />

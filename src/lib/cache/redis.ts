@@ -30,6 +30,14 @@ export function getRedisCacheMode(): CacheMode {
     return "off";
   }
 
+  if (
+    process.env.NODE_ENV === "development" &&
+    env.REDIS_CACHE_MODE === "live" &&
+    process.env.REDIS_CACHE_LIVE_IN_DEV !== "true"
+  ) {
+    return "off";
+  }
+
   return getConfiguredCacheMode();
 }
 

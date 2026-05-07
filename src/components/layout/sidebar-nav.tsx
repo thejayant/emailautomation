@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   ChevronDown,
@@ -21,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAppData } from "@/components/app-data/app-data-provider";
 import { productContent } from "@/content/product";
 import {
   getDefaultOpenNavigationKeys,
@@ -56,9 +57,15 @@ function renderNavIcon(href: string, className: string) {
 function MobileNavCard({
   item,
   pathname,
+  getInstantNavProps,
 }: {
   item: ShellNavigationItem;
   pathname: string;
+  getInstantNavProps: (href: string) => {
+    onClick: () => void;
+    onFocus: () => void;
+    onMouseEnter: () => void;
+  };
 }) {
   const active = isNavigationItemActive(item, pathname);
 
@@ -74,6 +81,7 @@ function MobileNavCard({
       <Link
         href={item.href}
         aria-current={pathname === item.href ? "page" : undefined}
+        {...getInstantNavProps(item.href)}
         className="group flex items-center gap-3 rounded-[1.05rem] px-2 py-2 transition hover:bg-white/54"
       >
         <span
@@ -105,6 +113,7 @@ function MobileNavCard({
                 key={child.href}
                 href={child.href}
                 aria-current={childActive ? "page" : undefined}
+                {...getInstantNavProps(child.href)}
                 className={cn(
                   "flex items-center gap-3 rounded-[1.1rem] border px-3 py-2.5 text-sm font-medium transition",
                   childActive
@@ -137,11 +146,17 @@ function DesktopExpandedNavItem({
   pathname,
   open,
   onToggle,
+  getInstantNavProps,
 }: {
   item: ShellNavigationItem;
   pathname: string;
   open: boolean;
   onToggle: () => void;
+  getInstantNavProps: (href: string) => {
+    onClick: () => void;
+    onFocus: () => void;
+    onMouseEnter: () => void;
+  };
 }) {
   const active = isNavigationItemActive(item, pathname);
   const activeParentRoute = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -160,6 +175,7 @@ function DesktopExpandedNavItem({
         <Link
           href={item.href}
           aria-current={activeParentRoute ? "page" : undefined}
+          {...getInstantNavProps(item.href)}
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[0.95rem] px-2.5 py-2"
         >
           <span
@@ -213,6 +229,7 @@ function DesktopExpandedNavItem({
                     key={child.href}
                     href={child.href}
                     aria-current={childActive ? "page" : undefined}
+                    {...getInstantNavProps(child.href)}
                     className={cn(
                       "flex items-center gap-2.5 rounded-[0.95rem] border px-2.5 py-2 text-[13px] transition",
                       childActive
@@ -245,9 +262,15 @@ function DesktopExpandedNavItem({
 function DesktopCollapsedNavItem({
   item,
   pathname,
+  getInstantNavProps,
 }: {
   item: ShellNavigationItem;
   pathname: string;
+  getInstantNavProps: (href: string) => {
+    onClick: () => void;
+    onFocus: () => void;
+    onMouseEnter: () => void;
+  };
 }) {
   const active = isNavigationItemActive(item, pathname);
   const triggerClassName = cn(
@@ -276,6 +299,7 @@ function DesktopCollapsedNavItem({
         aria-current={pathname === item.href ? "page" : undefined}
         aria-label={item.label}
         title={item.label}
+        {...getInstantNavProps(item.href)}
         className={triggerClassName}
       >
         {icon}
@@ -304,7 +328,7 @@ function DesktopCollapsedNavItem({
           <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-foreground">{item.label}</p>
         </div>
         <DropdownMenuItem asChild className="rounded-[0.9rem] px-2.5 py-2">
-          <Link href={item.href} className="justify-between">
+          <Link href={item.href} {...getInstantNavProps(item.href)} className="justify-between">
             <span>Open {item.label}</span>
           </Link>
         </DropdownMenuItem>
@@ -316,6 +340,7 @@ function DesktopCollapsedNavItem({
               <Link
                 href={child.href}
                 aria-current={childActive ? "page" : undefined}
+                {...getInstantNavProps(child.href)}
                 className={cn(
                   "justify-between",
                   childActive ? "bg-[rgba(215,237,247,0.78)]" : "",
@@ -344,10 +369,25 @@ export function SidebarNav({
   collapsed?: boolean;
 }) {
   const pathname = usePathname() ?? "/dashboard";
+  const { prefetchRoute, showTabRoute } = useAppData();
+  const [optimisticPathname, setOptimisticPathname] = useState(pathname);
   const items = productContent.shell.navigation;
   const [manuallyOpenKeys, setManuallyOpenKeys] = useState<string[]>([]);
-  const activeOpenKeys = getDefaultOpenNavigationKeys(items, pathname);
+  const activeOpenKeys = getDefaultOpenNavigationKeys(items, optimisticPathname);
   const openKeys = Array.from(new Set([...manuallyOpenKeys, ...activeOpenKeys]));
+
+  useEffect(() => {
+    setOptimisticPathname(pathname);
+  }, [pathname]);
+
+  const getInstantNavProps = (href: string) => ({
+    onClick: () => {
+      setOptimisticPathname(href);
+      showTabRoute(href);
+    },
+    onFocus: () => prefetchRoute(href),
+    onMouseEnter: () => prefetchRoute(href),
+  });
 
   const toggleGroup = (href: string) => {
     setManuallyOpenKeys((current) =>
@@ -360,7 +400,12 @@ export function SidebarNav({
       <nav className="scrollbar-none min-w-0 overflow-x-auto">
         <div className="flex min-w-max gap-3 pb-1">
           {items.map((item) => (
-            <MobileNavCard key={item.href} item={item} pathname={pathname} />
+            <MobileNavCard
+              key={item.href}
+              item={item}
+              pathname={optimisticPathname}
+              getInstantNavProps={getInstantNavProps}
+            />
           ))}
         </div>
       </nav>
@@ -372,14 +417,20 @@ export function SidebarNav({
       <div className={cn("grid", collapsed ? "gap-2" : "gap-3")}>
         {items.map((item) =>
           collapsed ? (
-            <DesktopCollapsedNavItem key={item.href} item={item} pathname={pathname} />
+            <DesktopCollapsedNavItem
+              key={item.href}
+              item={item}
+              pathname={optimisticPathname}
+              getInstantNavProps={getInstantNavProps}
+            />
           ) : (
             <DesktopExpandedNavItem
               key={item.href}
               item={item}
-              pathname={pathname}
+              pathname={optimisticPathname}
               open={openKeys.includes(item.href)}
               onToggle={() => toggleGroup(item.href)}
+              getInstantNavProps={getInstantNavProps}
             />
           ),
         )}

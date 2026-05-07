@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { invalidateAppData } from "@/lib/app-data/client";
 import { cn } from "@/lib/utils";
 
 export function ProjectLogoForm({
@@ -46,6 +47,7 @@ export function ProjectLogoForm({
           }
 
           toast.success(payload?.message ?? "Project logo updated.");
+          invalidateAppData("project");
           router.refresh();
         });
       }}

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { productContent } from "@/content/product";
 import { Button } from "@/components/ui/button";
+import { invalidateAppData } from "@/lib/app-data/client";
 
 export function LiveRefresh({
   autoRefresh = false,
@@ -36,6 +37,7 @@ export function LiveRefresh({
         await fetch(syncEndpoint, {
           method: "POST",
         });
+        invalidateAppData(["inbox", "dashboard", "analytics"]);
       } catch {
         // Refresh the view even if the sync request fails so the UI stays usable.
       } finally {
@@ -61,6 +63,8 @@ export function LiveRefresh({
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         return;
       }
+
+      invalidateAppData(["inbox", "dashboard", "analytics"]);
 
       startTransition(() => {
         router.refresh();

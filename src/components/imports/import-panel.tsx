@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { productContent } from "@/content/product";
 import { Button } from "@/components/ui/button";
+import { invalidateAppData } from "@/lib/app-data/client";
 
 type ImportPanelProps = {
   initialSheetUrl?: string;
@@ -42,6 +43,7 @@ export function ImportPanel({ initialSheetUrl = "" }: ImportPanelProps) {
     }
 
     router.push(`/imports?${params.toString()}`);
+    invalidateAppData("imports");
     router.refresh();
   }
 

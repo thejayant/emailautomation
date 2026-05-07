@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getProjectMonogram, type ProjectSummary } from "@/lib/projects/shared";
+import { invalidateAppData } from "@/lib/app-data/client";
 import { cn } from "@/lib/utils";
 
 function ProjectAvatar({
@@ -146,6 +147,7 @@ export function ProjectSwitcher({
                       return;
                     }
 
+                    invalidateAppData("project");
                     router.refresh();
                   });
                 }}

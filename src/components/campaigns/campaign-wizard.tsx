@@ -21,6 +21,7 @@ import {
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import type { ContactRecord } from "@/lib/types/contact";
+import { invalidateAppData } from "@/lib/app-data/client";
 import { cn } from "@/lib/utils";
 import {
   buildLaunchChecklist,
@@ -439,6 +440,8 @@ export function CampaignWizard({
           toast.error(creatorCopy.toasts.missingCampaignId);
           return;
         }
+
+        invalidateAppData("campaigns");
 
         if (mode === "edit") {
           toast.success(creatorCopy.toasts.updated);

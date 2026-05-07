@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 import { productContent } from "@/content/product";
+import { invalidateAppData } from "@/lib/app-data/client";
 import { profileSchema } from "@/lib/zod/schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ export function ProfileForm({
       }
 
       toast.success(productContent.profile.form.successMessage);
+      invalidateAppData("settings");
       router.refresh();
     });
   });

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { invalidateAppData } from "@/lib/app-data/client";
 
 type ManualContactFormProps = {
   title?: string;
@@ -82,6 +83,7 @@ export function ManualContactForm({
       }
 
       if (refreshOnSuccess) {
+        invalidateAppData("contacts");
         router.refresh();
       }
 

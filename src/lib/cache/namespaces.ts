@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { safeRedisIncrement, safeRedisDelete, safeRedisGet } from "@/lib/cache/redis";
 
 function sanitizeSegment(value: string | number) {
@@ -25,7 +26,7 @@ export function getInboxNamespaceId(userId: string, workspaceId: string, project
   return buildNamespaceId(["inbox", "user", userId, "workspace", workspaceId, "project", projectId]);
 }
 
-async function readNamespaceVersion(namespaceId: string, label: string) {
+const readNamespaceVersion = cache(async (namespaceId: string, label: string) => {
   const raw = await safeRedisGet(namespaceId, label);
 
   if (raw == null) {
@@ -34,7 +35,7 @@ async function readNamespaceVersion(namespaceId: string, label: string) {
 
   const parsed = typeof raw === "string" ? Number(raw) : Number(raw);
   return Number.isFinite(parsed) ? parsed : 0;
-}
+});
 
 export async function getShellNamespaceVersion(userId: string) {
   return readNamespaceVersion(getShellNamespaceId(userId), "namespace-shell");

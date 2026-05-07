@@ -23,8 +23,8 @@ import {
   listInboxThreadSummaries,
   listWorkspaceProjectMetrics,
 } from "@/services/analytics-service";
-import { listCampaigns, listTemplates } from "@/services/campaign-service";
-import { listContacts, listImports, listWorkspaceContactTags } from "@/services/import-service";
+import { listCampaigns, listTemplates } from "@/services/campaign-read-service";
+import { listContacts, listImports, listWorkspaceContactTags } from "@/services/import-read-service";
 
 const getCachedWorkspaceProjectMetricsInternal = cache(
   async (userId: string, workspaceId: string) => {

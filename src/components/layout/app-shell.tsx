@@ -8,6 +8,8 @@ import { ProjectSwitcher } from "@/components/layout/project-switcher";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { productContent } from "@/content/product";
+import { useAppData } from "@/components/app-data/app-data-provider";
+import { clearAppDataCache } from "@/lib/app-data/client";
 import {
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   parseSidebarCollapsed,
@@ -66,6 +68,7 @@ export function AppShell({
     sender_signature: string | null;
   }>;
 }) {
+  const { prefetchRoute, showTabRoute } = useAppData();
   const isDesktopSidebarCollapsed = useSyncExternalStore(
     subscribeToSidebarPreference,
     getSidebarPreferenceSnapshot,
@@ -78,6 +81,11 @@ export function AppShell({
       serializeSidebarCollapsed(value),
     );
     window.dispatchEvent(new Event(SIDEBAR_COLLAPSED_EVENT));
+  };
+  const settingsNavProps = {
+    onClick: () => showTabRoute("/settings"),
+    onFocus: () => prefetchRoute("/settings"),
+    onMouseEnter: () => prefetchRoute("/settings"),
   };
 
   return (
@@ -102,7 +110,7 @@ export function AppShell({
                 {shellTitle ?? brandSubtitle}
               </p>
             </Link>
-            <form action="/api/auth/sign-out" method="post">
+            <form action="/api/auth/sign-out" method="post" onSubmit={clearAppDataCache}>
               <Button type="submit" size="sm" variant="outline" className="justify-center">
                 <LogOut className="size-4" />
                 {productContent.shell.signOutLabel}
@@ -201,6 +209,7 @@ export function AppShell({
                   href="/settings"
                   aria-label="Work Settings"
                   title="Work Settings"
+                  {...settingsNavProps}
                   className="glass-chip flex size-12 items-center justify-center rounded-[1.25rem] text-sidebar-foreground transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(17,39,63,0.12)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring"
                 >
                   <span className="sidebar-helper-settings-icon">
@@ -208,7 +217,7 @@ export function AppShell({
                     <Settings2 className="size-4.5 text-[var(--accent-foreground)]" />
                   </span>
                 </Link>
-                <form action="/api/auth/sign-out" method="post">
+                <form action="/api/auth/sign-out" method="post" onSubmit={clearAppDataCache}>
                   <button
                     type="submit"
                     aria-label={productContent.shell.signOutLabel}
@@ -231,7 +240,7 @@ export function AppShell({
                     variant="outline"
                     className="sidebar-helper-button sidebar-helper-settings-button w-full justify-start"
                   >
-                    <Link href="/settings">
+                    <Link href="/settings" {...settingsNavProps}>
                       <span className="sidebar-helper-settings-icon">
                         <span className="sidebar-helper-settings-orb" />
                         <Settings2 className="size-4.5 text-[var(--accent-foreground)]" />
@@ -241,7 +250,7 @@ export function AppShell({
                       </span>
                     </Link>
                   </Button>
-                  <form action="/api/auth/sign-out" method="post" className="sidebar-helper-form">
+                  <form action="/api/auth/sign-out" method="post" className="sidebar-helper-form" onSubmit={clearAppDataCache}>
                     <Button
                       type="submit"
                       variant="outline"

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { invalidateAppData } from "@/lib/app-data/client";
 import type { InboxThreadDetail, InboxThreadSummary } from "@/lib/inbox/threads";
 import { cn } from "@/lib/utils";
 
@@ -126,6 +127,7 @@ export function ThreadViewer({
         return;
       }
 
+      invalidateAppData(["inbox", "dashboard", "analytics"]);
       router.refresh();
       toast.success(`Marked thread as ${replyDisposition}.`);
     });
@@ -312,6 +314,7 @@ export function ThreadViewer({
                   }
 
                   setDraft("");
+                  invalidateAppData(["inbox", "dashboard", "analytics"]);
                   router.refresh();
                   toast.success(viewerCopy.sendReplySuccess);
                 });

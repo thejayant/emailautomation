@@ -1,5 +1,4 @@
 import "server-only";
-import { google } from "googleapis";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { decryptToken, encryptToken } from "@/lib/crypto/tokens";
 import { classifyReplyDisposition } from "@/lib/utils/reply-disposition";
@@ -67,14 +66,18 @@ export type MailboxAccountListItem = {
   last_sync_cursor?: string | null;
 };
 
-function createGoogleOAuthClient(redirectUri?: string) {
+async function createGoogleOAuthClient(redirectUri?: string) {
   requireGoogleConfiguration();
+  const { google } = await import("googleapis");
 
-  return new google.auth.OAuth2(
+  return {
+    auth: new google.auth.OAuth2(
     env.GOOGLE_CLIENT_ID,
     env.GOOGLE_CLIENT_SECRET,
     redirectUri ?? env.GOOGLE_OAUTH_REDIRECT_URI,
-  );
+    ),
+    google,
+  };
 }
 
 function getMicrosoftAuthorityBaseUrl() {
@@ -182,7 +185,7 @@ async function exchangeMicrosoftCodeInternal(code: string, redirectUri?: string)
 }
 
 async function refreshGoogleToken(connectionId: string, refreshToken: string) {
-  const auth = createGoogleOAuthClient();
+  const { auth } = await createGoogleOAuthClient();
   auth.setCredentials({
     refresh_token: refreshToken,
   });
@@ -428,14 +431,17 @@ export function createMailboxConnectUrl(
 ) {
   if (provider === "gmail") {
     requireGoogleConfiguration();
-    const auth = createGoogleOAuthClient(options?.redirectUri);
-    return auth.generateAuthUrl({
-      access_type: "offline",
-      prompt: "consent",
-      scope: options?.scopes?.length ? options.scopes : GMAIL_SCOPES,
-      state,
-      include_granted_scopes: true,
-    });
+    const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    url.searchParams.set("client_id", env.GOOGLE_CLIENT_ID ?? "");
+    url.searchParams.set("redirect_uri", options?.redirectUri ?? env.GOOGLE_OAUTH_REDIRECT_URI ?? "");
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("access_type", "offline");
+    url.searchParams.set("prompt", "consent");
+    url.searchParams.set("scope", (options?.scopes?.length ? options.scopes : GMAIL_SCOPES).join(" "));
+    url.searchParams.set("state", state);
+    url.searchParams.set("include_granted_scopes", "true");
+
+    return url.toString();
   }
 
   requireMicrosoftConfiguration();
@@ -464,7 +470,7 @@ export async function exchangeMailboxCode(
   options?: { redirectUri?: string },
 ) {
   if (provider === "gmail") {
-    const auth = createGoogleOAuthClient(options?.redirectUri);
+    const { auth, google } = await createGoogleOAuthClient(options?.redirectUri);
     const { tokens } = await auth.getToken(code);
 
     if (!tokens.access_token) {

@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button, type ButtonProps } from "@/components/ui/button";
+import { invalidateAppData } from "@/lib/app-data/client";
 
 type SendNowButtonProps = {
   campaignId: string;
@@ -48,6 +49,7 @@ export function SendNowButton({
       }
 
       if (refreshOnSuccess) {
+        invalidateAppData("campaigns");
         router.refresh();
       }
     });
