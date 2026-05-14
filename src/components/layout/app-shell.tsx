@@ -92,15 +92,15 @@ export function AppShell({
     <div className="page-gradient min-h-screen px-3 py-3 sm:px-4 sm:py-4">
       <div
         className={cn(
-          "relative mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1800px] flex-col gap-3 transition-[grid-template-columns] duration-300 ease-out xl:grid",
+          "relative mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1840px] flex-col gap-3 transition-[grid-template-columns] duration-300 ease-out xl:grid",
           isDesktopSidebarCollapsed
             ? "xl:grid-cols-[96px_minmax(0,1fr)]"
             : "xl:grid-cols-[320px_minmax(0,1fr)]",
         )}
       >
-        <div className="pointer-events-none absolute inset-x-12 top-0 h-72 rounded-full bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.88),transparent_64%)]" />
+        <div className="pointer-events-none absolute inset-x-12 top-0 h-72 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.72),transparent_74%)]" />
 
-        <div className="glass-nav relative z-10 rounded-[32px] p-4 text-sidebar-foreground shadow-[0_24px_56px_rgba(17,39,63,0.12)] xl:hidden">
+        <div className="glass-nav relative z-10 rounded-[24px] p-4 text-sidebar-foreground shadow-[0_24px_56px_rgba(44,55,91,0.1)] xl:hidden">
           <div className="flex items-start justify-between gap-4">
             <Link href="/dashboard" className="min-w-0 space-y-1">
               <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-sidebar-muted">
@@ -134,7 +134,7 @@ export function AppShell({
         <aside className="hidden xl:block">
           <div
             className={cn(
-              "sidebar-shell glass-nav sticky top-4 flex h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-[34px] p-6 text-sidebar-foreground shadow-[0_26px_68px_rgba(17,39,63,0.14)] transition-[padding] duration-300 ease-out",
+              "sidebar-shell glass-nav sticky top-4 flex h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-[26px] p-6 text-sidebar-foreground shadow-[0_26px_68px_rgba(44,55,91,0.12)] transition-[padding] duration-300 ease-out",
               isDesktopSidebarCollapsed ? "sidebar-shell-collapsed px-4 py-5" : "",
             )}
           >
@@ -168,7 +168,7 @@ export function AppShell({
                 aria-label={isDesktopSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 onClick={() => setSidebarCollapsed(!isDesktopSidebarCollapsed)}
                 className={cn(
-                  "sidebar-sparkle glass-chip group relative flex size-11 items-center justify-center overflow-hidden rounded-[1.35rem] transition-[transform,box-shadow,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:rotate-[2deg] hover:shadow-[0_18px_36px_rgba(17,39,63,0.16)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
+                  "sidebar-sparkle glass-chip group relative flex size-11 items-center justify-center overflow-hidden rounded-[1.05rem] transition-[transform,box-shadow,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:rotate-[2deg] hover:shadow-[0_18px_36px_rgba(44,55,91,0.12)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
                   isDesktopSidebarCollapsed ? "bg-white/78" : "",
                 )}
               >
@@ -229,7 +229,7 @@ export function AppShell({
                 </form>
               </div>
             ) : (
-              <div className="sidebar-helper glass-control mt-6 min-h-fit shrink-0 overflow-hidden rounded-[30px] p-5 xl:p-6">
+              <div className="sidebar-helper glass-control mt-6 min-h-fit shrink-0 overflow-hidden rounded-[22px] p-5 xl:p-6">
                 <p className="sidebar-helper-title text-sm font-semibold tracking-[-0.02em] text-sidebar-foreground">
                   {productContent.shell.helper.title}
                 </p>
@@ -267,7 +267,7 @@ export function AppShell({
         </aside>
 
         <main
-          className="solid-content relative min-w-0 overflow-hidden rounded-[34px] p-4 sm:p-6 xl:p-8"
+          className="solid-content relative min-w-0 overflow-hidden rounded-[28px] p-4 sm:p-6 xl:p-8"
           data-tour="app-main"
         >
           {children}

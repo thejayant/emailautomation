@@ -77,7 +77,42 @@ function buildDraftPayload(input: SendMessageInput) {
         },
       },
     ],
+    attachments: (input.attachments ?? []).map((attachment) => ({
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      name: attachment.filename,
+      contentType: attachment.contentType || "application/octet-stream",
+      contentBytes: attachment.contentBase64,
+    })),
   };
+}
+
+async function addGraphAttachments(
+  accessToken: string,
+  messageId: string | null | undefined,
+  attachments: SendMessageInput["attachments"],
+) {
+  if (!messageId || !attachments?.length) {
+    return;
+  }
+
+  for (const attachment of attachments) {
+    await graphRequest<GraphMessageRecord>(
+      `/me/messages/${encodeURIComponent(messageId)}/attachments`,
+      accessToken,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: attachment.filename,
+          contentType: attachment.contentType || "application/octet-stream",
+          contentBytes: attachment.contentBase64,
+        }),
+      },
+    );
+  }
 }
 
 function buildHtmlFromMessage(message: GraphMessageRecord) {
@@ -144,6 +179,8 @@ export class OutlookMailboxProvider implements MailboxProvider {
           }),
         },
       );
+
+      await addGraphAttachments(input.accessToken, replyDraft.id, input.attachments);
 
       await graphRequest<null>(
         `/me/messages/${encodeURIComponent(replyDraft.id ?? "")}/send`,

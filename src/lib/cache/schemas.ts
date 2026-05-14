@@ -112,6 +112,13 @@ export const inboxThreadSummarySchema = z.object({
   subject: z.string().nullable(),
   senderEmail: z.string().nullable(),
   receivedAt: z.string().nullable(),
+  snippet: z.string().nullable(),
+  messageCount: z.number(),
+  isRead: z.boolean(),
+  isStarred: z.boolean(),
+  hasReplied: z.boolean(),
+  latestDirection: z.string().nullable(),
+  replyDisposition: z.string().nullable(),
 });
 
 export const inboxThreadSummaryBatchSchema = z.object({

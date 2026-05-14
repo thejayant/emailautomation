@@ -39,7 +39,7 @@ function ProjectAvatar({
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-[1.05rem] border border-white/78 bg-[linear-gradient(180deg,rgba(215,237,247,0.92),rgba(255,255,255,0.82))] font-mono text-[11px] uppercase tracking-[0.2em] text-accent-foreground shadow-[0_12px_24px_rgba(17,39,63,0.08)]",
+        "flex shrink-0 items-center justify-center rounded-[1.05rem] border border-[rgba(219,225,238,0.9)] bg-[linear-gradient(180deg,rgba(240,233,255,0.92),rgba(255,255,255,0.88))] font-mono text-[11px] uppercase tracking-[0.2em] text-accent-foreground shadow-[0_12px_24px_rgba(44,55,91,0.08)]",
         compact ? "size-9" : "size-10",
       )}
     >
@@ -124,7 +124,7 @@ export function ProjectSwitcher({
                 className={cn(
                   "justify-between rounded-[1rem] px-3 py-2.5",
                   selected
-                    ? "bg-[linear-gradient(180deg,rgba(215,237,247,0.92),rgba(201,230,242,0.86))] text-accent-foreground"
+              ? "bg-[linear-gradient(180deg,rgba(240,233,255,0.96),rgba(229,217,255,0.9))] text-accent-foreground"
                     : "",
                 )}
                 onSelect={() => {

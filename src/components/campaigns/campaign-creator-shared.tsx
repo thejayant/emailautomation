@@ -285,84 +285,87 @@ export function SummaryRail({
   onJump: (stepId: CampaignCreatorStepId) => void;
   className?: string;
 }) {
+  const readyToLaunch = checklist.every((item) => item.complete);
+  const summaryItems = [
+    {
+      label: creatorCopy.summary.starterLabel,
+      value:
+        starterType === "template"
+          ? `${creatorCopy.summary.templateStarter}${selectedTemplateName ? `: ${selectedTemplateName}` : ""}`
+          : creatorCopy.summary.scratchStarter,
+      stepId: "start" as const,
+    },
+    {
+      label: creatorCopy.summary.senderLabel,
+      value: senderEmail ?? creatorCopy.summary.noSender,
+      stepId: "start" as const,
+    },
+    {
+      label: creatorCopy.summary.contactsLabel,
+      value: `${selectedContactsCount} selected`,
+      stepId: "audience" as const,
+    },
+    {
+      label: creatorCopy.summary.subjectLabel,
+      value: primarySubject.trim() || creatorCopy.summary.noSubject,
+      stepId: "message" as const,
+    },
+    {
+      label: creatorCopy.summary.followUpDelayLabel,
+      value: `${followUpDelayDays} day${followUpDelayDays === 1 ? "" : "s"}`,
+      stepId: "message" as const,
+    },
+    {
+      label: creatorCopy.summary.sendWindowLabel,
+      value: sendWindowSummary,
+      stepId: "review" as const,
+    },
+    {
+      label: creatorCopy.summary.dailyCapLabel,
+      value: `${dailySendLimit} emails / day`,
+      stepId: "review" as const,
+    },
+  ];
+
   return (
-    <Card className={cn("overflow-hidden", className)}>
-      <CardHeader className="gap-4 border-b border-white/56 bg-white/28">
-        <div className="space-y-1">
-          <CardTitle>{creatorCopy.summary.title}</CardTitle>
+    <Card className={cn("overflow-hidden rounded-[1.65rem] bg-white/78", className)}>
+      <CardHeader className="gap-5 border-b border-slate-200/80 bg-white/70">
+        <div className="space-y-3">
+          <CardTitle className="text-[1.2rem]">{creatorCopy.summary.title}</CardTitle>
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <span
+              className={cn(
+                "size-2.5 rounded-full",
+                readyToLaunch ? "bg-emerald-500" : "bg-amber-500",
+              )}
+            />
+            <span className={readyToLaunch ? "text-emerald-700" : "text-amber-700"}>
+              {readyToLaunch ? "Ready to launch" : "Needs attention"}
+            </span>
+          </div>
           <CardDescription>
-            Keep the launch details in view while you move through the flow.
+            Review your settings before launching.
           </CardDescription>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={senderEmail ? "success" : "warning"}>
-            {senderEmail ? creatorCopy.summary.senderReady : creatorCopy.summary.noSender}
-          </Badge>
-          <Badge variant={selectedContactsCount ? "success" : "warning"}>
-            {selectedContactsCount
-              ? creatorCopy.summary.contactsReady(selectedContactsCount)
-              : "No contacts selected"}
-          </Badge>
-          <Badge variant={primarySubject.trim().length >= 3 ? "success" : "warning"}>
-            {primarySubject.trim().length >= 3
-              ? creatorCopy.summary.subjectReady
-              : creatorCopy.summary.noSubject}
-          </Badge>
+        <div className="rounded-[1.2rem] border border-violet-100 bg-violet-50/72 px-4 py-4">
+          <p className="text-lg font-semibold text-foreground">{sequenceCount}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            steps in this sequence
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Estimated duration: ~{followUpDelayDays} day{followUpDelayDays === 1 ? "" : "s"}
+          </p>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-5 p-5 sm:p-6">
+      <CardContent className="grid gap-5 bg-white/50 p-5 sm:p-6">
         <div className="grid gap-4">
-          {[
-            {
-              label: creatorCopy.summary.starterLabel,
-              value:
-                starterType === "template"
-                  ? `${creatorCopy.summary.templateStarter}${selectedTemplateName ? ` · ${selectedTemplateName}` : ""}`
-                  : creatorCopy.summary.scratchStarter,
-              stepId: "start" as const,
-            },
-            {
-              label: creatorCopy.summary.senderLabel,
-              value: senderEmail ?? creatorCopy.summary.noSender,
-              stepId: "start" as const,
-            },
-            {
-              label: creatorCopy.summary.contactsLabel,
-              value: `${selectedContactsCount} selected`,
-              stepId: "audience" as const,
-            },
-            {
-              label: creatorCopy.summary.subjectLabel,
-              value: primarySubject.trim() || creatorCopy.summary.noSubject,
-              stepId: "message" as const,
-            },
-            {
-              label: creatorCopy.summary.followUpDelayLabel,
-              value: `${followUpDelayDays} day${followUpDelayDays === 1 ? "" : "s"}`,
-              stepId: "message" as const,
-            },
-            {
-              label: creatorCopy.summary.sendWindowLabel,
-              value: sendWindowSummary,
-              stepId: "review" as const,
-            },
-            {
-              label: creatorCopy.summary.dailyCapLabel,
-              value: `${dailySendLimit} emails / day`,
-              stepId: "review" as const,
-            },
-            {
-              label: creatorCopy.summary.sequenceLabel,
-              value: `${sequenceCount} step${sequenceCount === 1 ? "" : "s"}`,
-              stepId: "message" as const,
-            },
-          ].map((item) => (
+          {summaryItems.map((item) => (
             <div
               key={item.label}
-              className="flex items-start justify-between gap-3 rounded-[1.35rem] border border-white/60 bg-white/46 px-4 py-3"
+              className="flex items-start justify-between gap-3"
             >
               <div className="grid gap-1">
-                <p className="text-[11px] font-mono uppercase tracking-[0.22em] text-sidebar-muted">
+                <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-sidebar-muted">
                   {item.label}
                 </p>
                 <p className="text-sm font-medium text-foreground">{item.value}</p>
@@ -378,9 +381,9 @@ export function SummaryRail({
           ))}
         </div>
 
-        <div className="grid gap-3 rounded-[1.5rem] border border-white/60 bg-white/46 p-4">
+        <div className="grid gap-3 rounded-[1.25rem] border border-violet-100 bg-violet-50/62 p-4">
           <div className="space-y-1">
-            <p className="text-[11px] font-mono uppercase tracking-[0.22em] text-sidebar-muted">
+            <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-violet-700">
               {creatorCopy.review.checklistTitle}
             </p>
             <p className="text-sm text-muted-foreground">
@@ -394,8 +397,8 @@ export function SummaryRail({
                   className={cn(
                     "flex size-8 shrink-0 items-center justify-center rounded-full border",
                     item.complete
-                      ? "border-white/72 bg-[rgba(215,237,247,0.86)] text-accent-foreground"
-                      : "border-white/72 bg-white/60 text-muted-foreground",
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-white/72 bg-white/70 text-muted-foreground",
                   )}
                 >
                   {item.complete ? <Check className="size-4" /> : <ChevronRight className="size-4" />}

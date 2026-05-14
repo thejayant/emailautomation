@@ -30,31 +30,72 @@ function decodeBody(data?: string | null) {
   return Buffer.from(data, "base64url").toString("utf8");
 }
 
+function foldBase64(value: string) {
+  return value.match(/.{1,76}/g)?.join("\r\n") ?? value;
+}
+
+function sanitizeMimeFilename(value: string) {
+  return value.replace(/[\r\n"]/g, "_").slice(0, 140) || "attachment";
+}
+
 function buildMimeMessage(input: SendMessageInput) {
-  const boundary = `boundary_${randomUUID()}`;
+  const alternativeBoundary = `alternative_${randomUUID()}`;
+  const mixedBoundary = `mixed_${randomUUID()}`;
   const encodedText = Buffer.from(input.bodyText, "utf8").toString("base64");
   const encodedHtml = Buffer.from(normalizeEmailHtmlDocument(input.bodyHtml), "utf8").toString("base64");
+  const alternativePart = [
+    `--${alternativeBoundary}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    foldBase64(encodedText),
+    "",
+    `--${alternativeBoundary}`,
+    "Content-Type: text/html; charset=utf-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    foldBase64(encodedHtml),
+    "",
+    `--${alternativeBoundary}--`,
+  ];
+  const hasAttachments = Boolean(input.attachments?.length);
   const lines = [
     `From: ${input.fromEmail}`,
     `To: ${input.toEmail}`,
     "MIME-Version: 1.0",
     `Subject: ${input.subject}`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    hasAttachments
+      ? `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`
+      : `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
     "",
-    `--${boundary}`,
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    encodedText,
-    "",
-    `--${boundary}`,
-    "Content-Type: text/html; charset=utf-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    encodedHtml,
-    "",
-    `--${boundary}--`,
   ];
+
+  if (hasAttachments) {
+    lines.push(
+      `--${mixedBoundary}`,
+      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+      "",
+      ...alternativePart,
+      "",
+    );
+
+    for (const attachment of input.attachments ?? []) {
+      const filename = sanitizeMimeFilename(attachment.filename);
+      lines.push(
+        `--${mixedBoundary}`,
+        `Content-Type: ${attachment.contentType || "application/octet-stream"}; name="${filename}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-Disposition: attachment; filename="${filename}"`,
+        "",
+        foldBase64(attachment.contentBase64),
+        "",
+      );
+    }
+
+    lines.push(`--${mixedBoundary}--`);
+  } else {
+    lines.push(...alternativePart);
+  }
 
   return Buffer.from(lines.join("\r\n"))
     .toString("base64")

@@ -264,6 +264,8 @@ export async function getCachedInboxThreadSummaries(input: {
   projectId: string;
   limit: number;
   offset: number;
+  query?: string;
+  filter?: string;
 }) {
   const inboxVersion = await getInboxNamespaceVersion(
     input.userId,
@@ -283,6 +285,10 @@ export async function getCachedInboxThreadSummaries(input: {
     input.limit,
     "offset",
     input.offset,
+    "query",
+    input.query?.trim() || "all",
+    "filter",
+    input.filter || "all",
   ]);
 
   return readThroughJsonCache({
@@ -295,6 +301,8 @@ export async function getCachedInboxThreadSummaries(input: {
         projectId: input.projectId,
         limit: input.limit,
         offset: input.offset,
+        query: input.query,
+        filter: input.filter,
       }),
   });
 }

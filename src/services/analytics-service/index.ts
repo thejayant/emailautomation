@@ -2,10 +2,14 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   mapInboxThreadDetail,
   mapInboxThreadSummary,
+  type InboxCampaignSummary,
+  type InboxContactHistoryItem,
+  type InboxContactSummary,
   type InboxThreadMessage,
+  type InboxThreadState,
 } from "@/lib/inbox/threads";
 import { requireSupabaseConfiguration } from "@/lib/supabase/env";
-import { isMissingColumnResult } from "@/lib/utils/supabase-schema";
+import { isMissingColumnResult, isMissingTableResult } from "@/lib/utils/supabase-schema";
 import { listWorkspaceProjects } from "@/services/project-service";
 
 export type ProjectMetricsSummary = {
@@ -274,27 +278,42 @@ export async function listThreads(workspaceId: string, options?: { projectId?: s
 
 type RawInboxThreadRecord = {
   id: string;
+  gmail_thread_id?: string | null;
   subject: string | null;
+  snippet?: string | null;
   latest_message_at: string | null;
   campaign_contact_id?: string | null;
-  campaign_contact?: { status?: string | null; reply_disposition?: string | null } | null;
+  campaign_contact?: {
+    status?: string | null;
+    reply_disposition?: string | null;
+    replied_at?: string | null;
+    contact?: {
+      id?: string | null;
+      email?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+      company?: string | null;
+      job_title?: string | null;
+      website?: string | null;
+    } | null;
+    campaign?: {
+      id?: string | null;
+      name?: string | null;
+      status?: string | null;
+      created_at?: string | null;
+    } | null;
+  } | null;
   thread_messages: Array<{
     id: string;
     direction: string;
     from_email: string | null;
     to_emails: string[] | null;
     subject: string | null;
+    snippet?: string | null;
     body_text: string | null;
     body_html: string | null;
     sent_at: string;
   }> | null;
-};
-
-type InboxThreadSummaryRecord = {
-  id: string;
-  gmail_thread_id: string;
-  subject: string | null;
-  latest_message_at: string | null;
 };
 
 type InboxQueryError = {
@@ -312,7 +331,10 @@ type InboxThreadDetailQuery = {
 };
 
 const inboxThreadsSelect =
-  "id, subject, latest_message_at, campaign_contact_id, campaign_contact:campaign_contacts(status, reply_disposition), thread_messages(id, direction, from_email, to_emails, subject, body_text, body_html, sent_at)";
+  "id, gmail_thread_id, subject, snippet, latest_message_at, campaign_contact_id, campaign_contact:campaign_contacts(status, reply_disposition, replied_at, contact:contacts(id, email, first_name, last_name, company, job_title, website), campaign:campaigns(id, name, status, created_at)), thread_messages(id, direction, from_email, to_emails, subject, snippet, body_text, body_html, sent_at)";
+
+const inboxThreadsFallbackSelect =
+  "id, gmail_thread_id, subject, snippet, latest_message_at, campaign_contact_id, campaign_contact:campaign_contacts(status, contact:contacts(id, email, first_name, last_name, company, job_title, website), campaign:campaigns(id, name, status, created_at)), thread_messages(id, direction, from_email, to_emails, subject, snippet, body_text, body_html, sent_at)";
 
 function createInboxThreadDetailQuery(workspaceId: string, threadId: string, projectId?: string) {
   let query = createAdminSupabaseClient()
@@ -328,102 +350,252 @@ function createInboxThreadDetailQuery(workspaceId: string, threadId: string, pro
   return query;
 }
 
+function createInboxThreadListQuery(workspaceId: string, projectId?: string, fallback = false) {
+  let query = createAdminSupabaseClient()
+    .from("message_threads")
+    .select(fallback ? inboxThreadsFallbackSelect : inboxThreadsSelect)
+    .eq("workspace_id", workspaceId);
+
+  if (projectId) {
+    query = query.eq("project_id", projectId);
+  }
+
+  return query;
+}
+
 function mapRawInboxThread(thread: RawInboxThreadRecord) {
+  const contact = thread.campaign_contact?.contact
+    ? {
+        id: thread.campaign_contact.contact.id ?? null,
+        email: thread.campaign_contact.contact.email ?? null,
+        firstName: thread.campaign_contact.contact.first_name ?? null,
+        lastName: thread.campaign_contact.contact.last_name ?? null,
+        company: thread.campaign_contact.contact.company ?? null,
+        jobTitle: thread.campaign_contact.contact.job_title ?? null,
+        website: thread.campaign_contact.contact.website ?? null,
+      }
+    : null;
+  const campaign = thread.campaign_contact?.campaign
+    ? {
+        id: thread.campaign_contact.campaign.id ?? null,
+        name: thread.campaign_contact.campaign.name ?? null,
+        status: thread.campaign_contact.campaign.status ?? null,
+        createdAt: thread.campaign_contact.campaign.created_at ?? null,
+        audienceCount: null,
+      }
+    : null;
+
   return {
     id: thread.id,
     subject: thread.subject,
+    snippet: thread.snippet ?? null,
     latest_message_at: thread.latest_message_at,
     campaign_contact_id: thread.campaign_contact_id ?? null,
     campaign_status: thread.campaign_contact?.status ?? null,
     reply_disposition: thread.campaign_contact?.reply_disposition ?? null,
+    contact,
+    campaign,
     messages:
       ((thread.thread_messages as InboxThreadMessage[] | null) ?? []).map((message) => ({
         ...message,
+        snippet: message.snippet ?? null,
         body_html: message.body_html ?? null,
       })),
   };
 }
 
+async function getInboxThreadStateMap(
+  workspaceId: string,
+  projectId: string | undefined,
+  threadIds: string[],
+) {
+  if (!projectId || !threadIds.length) {
+    return new Map<string, InboxThreadState>();
+  }
+
+  const result = await createAdminSupabaseClient()
+    .from("inbox_thread_states")
+    .select("thread_id, last_read_at, starred_at, updated_by_user_id")
+    .eq("workspace_id", workspaceId)
+    .eq("project_id", projectId)
+    .in("thread_id", threadIds);
+
+  if (result.error) {
+    if (isMissingTableResult(result, "inbox_thread_states")) {
+      return new Map<string, InboxThreadState>();
+    }
+
+    throw result.error;
+  }
+
+  return new Map(
+    ((result.data ?? []) as Array<{
+      thread_id: string;
+      last_read_at: string | null;
+      starred_at: string | null;
+      updated_by_user_id?: string | null;
+    }>).map((state) => [
+      state.thread_id,
+      {
+        lastReadAt: state.last_read_at ?? null,
+        starredAt: state.starred_at ?? null,
+        updatedByUserId: state.updated_by_user_id ?? null,
+      },
+    ]),
+  );
+}
+
+function normalizeInboxFilter(value: string | null | undefined) {
+  return ["unread", "replied", "starred"].includes(value ?? "") ? value : "all";
+}
+
+function matchesInboxSearch(summary: ReturnType<typeof mapInboxThreadSummary>, query: string) {
+  if (!query) {
+    return true;
+  }
+
+  const haystack = [
+    summary.subject,
+    summary.senderEmail,
+    summary.snippet,
+    summary.replyDisposition,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(query.toLowerCase());
+}
+
 export async function listInboxThreadSummaries(
   workspaceId: string,
-  options?: { projectId?: string; limit?: number; offset?: number },
+  options?: { projectId?: string; limit?: number; offset?: number; query?: string; filter?: string },
 ) {
   requireSupabaseConfiguration();
 
-  const supabase = createAdminSupabaseClient();
   const limit = Math.max(1, Math.min(options?.limit ?? 10, 50));
   const offset = Math.max(0, options?.offset ?? 0);
-  let query = supabase
-    .from("message_threads")
-    .select("id, gmail_thread_id, subject, latest_message_at")
-    .eq("workspace_id", workspaceId);
+  const fetchWindow = Math.min(180, Math.max(offset + limit + 1, offset + limit * 4 + 20));
+  let result = await createInboxThreadListQuery(workspaceId, options?.projectId)
+    .order("latest_message_at", { ascending: false })
+    .range(0, fetchWindow - 1);
 
-  if (options?.projectId) {
-    query = query.eq("project_id", options.projectId);
-  }
+  const { error } = result;
 
-  const orderedQuery = query.order("latest_message_at", { ascending: false }) as unknown as {
-    range: (
-      from: number,
-      to: number,
-    ) => Promise<{ data: unknown; error: { message?: string | null } | null }>;
-  };
-  const result = await orderedQuery.range(offset, offset + limit);
-
-  const { data, error } = result;
-
-  if (error) {
+  if (error && isMissingColumnResult(result, "campaign_contacts", "reply_disposition")) {
+    result = await createInboxThreadListQuery(workspaceId, options?.projectId, true)
+      .order("latest_message_at", { ascending: false })
+      .range(0, fetchWindow - 1);
+  } else if (error) {
     throw error;
   }
 
-  const summaryRows = (data ?? []) as InboxThreadSummaryRecord[];
-  const gmailThreadIds = summaryRows.map((thread) => thread.gmail_thread_id).filter(Boolean);
-  const messagesByThreadId = new Map<string, InboxThreadMessage[]>();
-
-  if (gmailThreadIds.length) {
-    const { data: rawMessages, error: messagesError } = await supabase
-      .from("thread_messages")
-      .select("gmail_thread_id, direction, from_email, subject, sent_at")
-      .in("gmail_thread_id", gmailThreadIds)
-      .order("sent_at", { ascending: false });
-
-    if (messagesError) {
-      throw messagesError;
-    }
-
-    for (const [index, message] of ((rawMessages ?? []) as Array<{
-      gmail_thread_id: string;
-      direction: string;
-      from_email: string | null;
-      subject: string | null;
-      sent_at: string;
-    }>).entries()) {
-      const bucket = messagesByThreadId.get(message.gmail_thread_id) ?? [];
-      bucket.push({
-        id: `${message.gmail_thread_id}:${message.sent_at}:${index}`,
-        direction: message.direction,
-        from_email: message.from_email,
-        subject: message.subject,
-        body_text: null,
-        sent_at: message.sent_at,
-      });
-      messagesByThreadId.set(message.gmail_thread_id, bucket);
-    }
+  if (result.error) {
+    throw result.error;
   }
 
-  const threads = summaryRows.map((thread) =>
-    mapInboxThreadSummary({
-      id: thread.id,
-      subject: thread.subject,
-      latest_message_at: thread.latest_message_at,
-      messages: messagesByThreadId.get(thread.gmail_thread_id) ?? [],
-    }),
+  const summaryRows = (result.data ?? []) as RawInboxThreadRecord[];
+  const states = await getInboxThreadStateMap(
+    workspaceId,
+    options?.projectId,
+    summaryRows.map((thread) => thread.id),
   );
+  const searchQuery = options?.query?.trim() ?? "";
+  const filter = normalizeInboxFilter(options?.filter);
+  const threads = summaryRows
+    .map((thread) => mapInboxThreadSummary(mapRawInboxThread(thread), states.get(thread.id)))
+    .filter((thread) => matchesInboxSearch(thread, searchQuery))
+    .filter((thread) => {
+      if (filter === "unread") {
+        return !thread.isRead;
+      }
+
+      if (filter === "replied") {
+        return thread.hasReplied;
+      }
+
+      if (filter === "starred") {
+        return thread.isStarred;
+      }
+
+      return true;
+    });
 
   return {
-    threads: threads.slice(0, limit),
-    hasMore: summaryRows.length > limit,
+    threads: threads.slice(offset, offset + limit),
+    hasMore: threads.length > offset + limit,
   };
+}
+
+function historyLabel(eventType: string) {
+  switch (eventType) {
+    case "opened":
+      return "Opened email";
+    case "clicked":
+      return "Clicked link";
+    case "replied":
+      return "Replied";
+    case "meeting_booked":
+      return "Booked meeting";
+    case "unsubscribed":
+      return "Unsubscribed";
+    case "sent":
+      return "Sent email";
+    case "bounced":
+      return "Bounced";
+    default:
+      return eventType.replace(/_/g, " ");
+  }
+}
+
+async function getInboxContactHistory(workspaceId: string, campaignContactId: string | null) {
+  if (!campaignContactId) {
+    return [] as InboxContactHistoryItem[];
+  }
+
+  const result = await createAdminSupabaseClient()
+    .from("message_events")
+    .select("id, event_type, occurred_at")
+    .eq("workspace_id", workspaceId)
+    .eq("campaign_contact_id", campaignContactId)
+    .order("occurred_at", { ascending: false })
+    .limit(8);
+
+  if (result.error) {
+    if (isMissingTableResult(result, "message_events")) {
+      return [];
+    }
+
+    throw result.error;
+  }
+
+  return ((result.data ?? []) as Array<{
+    id: string;
+    event_type: string;
+    occurred_at: string;
+  }>).map((event) => ({
+    id: event.id,
+    eventType: event.event_type,
+    label: historyLabel(event.event_type),
+    occurredAt: event.occurred_at,
+  }));
+}
+
+async function getCampaignAudienceCount(campaign: InboxCampaignSummary | null) {
+  if (!campaign?.id) {
+    return null;
+  }
+
+  const result = await createAdminSupabaseClient()
+    .from("campaign_contacts")
+    .select("id", { count: "exact", head: true })
+    .eq("campaign_id", campaign.id);
+
+  if (result.error) {
+    return null;
+  }
+
+  return result.count ?? null;
 }
 
 export async function getInboxThreadDetail(
@@ -438,9 +610,7 @@ export async function getInboxThreadDetail(
   if (isMissingColumnResult(result, "campaign_contacts", "reply_disposition")) {
     let fallbackQuery = createAdminSupabaseClient()
       .from("message_threads")
-      .select(
-        "id, subject, latest_message_at, campaign_contact_id, campaign_contact:campaign_contacts(status), thread_messages(id, direction, from_email, to_emails, subject, body_text, body_html, sent_at)",
-      )
+      .select(inboxThreadsFallbackSelect)
       .eq("workspace_id", workspaceId)
       .eq("id", threadId) as unknown as InboxThreadDetailQuery;
 
@@ -461,5 +631,94 @@ export async function getInboxThreadDetail(
     return null;
   }
 
-  return mapInboxThreadDetail(mapRawInboxThread(data as RawInboxThreadRecord));
+  const rawThread = data as RawInboxThreadRecord;
+  const [states, history] = await Promise.all([
+    getInboxThreadStateMap(workspaceId, options?.projectId, [rawThread.id]),
+    getInboxContactHistory(workspaceId, rawThread.campaign_contact_id ?? null),
+  ]);
+  const mappedThread = mapRawInboxThread(rawThread);
+  const audienceCount = await getCampaignAudienceCount(mappedThread.campaign);
+
+  return mapInboxThreadDetail(
+    {
+      ...mappedThread,
+      campaign: mappedThread.campaign
+        ? {
+            ...mappedThread.campaign,
+            audienceCount,
+          }
+        : null,
+      history,
+    },
+    states.get(rawThread.id),
+  );
+}
+
+export async function updateInboxThreadState(input: {
+  workspaceId: string;
+  projectId: string;
+  userId: string;
+  threadId: string;
+  read?: boolean;
+  starred?: boolean;
+}) {
+  requireSupabaseConfiguration();
+
+  const supabase = createAdminSupabaseClient();
+  const now = new Date().toISOString();
+  const existingResult = await supabase
+    .from("inbox_thread_states")
+    .select("last_read_at, starred_at")
+    .eq("workspace_id", input.workspaceId)
+    .eq("project_id", input.projectId)
+    .eq("thread_id", input.threadId)
+    .maybeSingle();
+
+  if (existingResult.error && !isMissingTableResult(existingResult, "inbox_thread_states")) {
+    throw existingResult.error;
+  }
+
+  const existing = (existingResult.data ?? {}) as {
+    last_read_at?: string | null;
+    starred_at?: string | null;
+  };
+  const row = {
+    workspace_id: input.workspaceId,
+    project_id: input.projectId,
+    thread_id: input.threadId,
+    last_read_at:
+      typeof input.read === "boolean"
+        ? input.read
+          ? now
+          : null
+        : existing.last_read_at ?? null,
+    starred_at:
+      typeof input.starred === "boolean"
+        ? input.starred
+          ? now
+          : null
+        : existing.starred_at ?? null,
+    updated_by_user_id: input.userId,
+  };
+  const result = await supabase
+    .from("inbox_thread_states")
+    .upsert(row, { onConflict: "workspace_id,project_id,thread_id" })
+    .select("last_read_at, starred_at, updated_by_user_id")
+    .single();
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  const state = result.data as {
+    last_read_at?: string | null;
+    starred_at?: string | null;
+    updated_by_user_id?: string | null;
+  };
+
+  return {
+    lastReadAt: state.last_read_at ?? null,
+    starredAt: state.starred_at ?? null,
+    updatedByUserId: state.updated_by_user_id ?? null,
+  } satisfies InboxThreadState;
 }

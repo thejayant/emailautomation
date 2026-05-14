@@ -9,6 +9,12 @@ export type SendMessageInput = {
   bodyText: string;
   replyThreadId?: string | null;
   replyMessageId?: string | null;
+  attachments?: Array<{
+    filename: string;
+    contentType: string;
+    contentBase64: string;
+    size: number;
+  }>;
 };
 
 export type ProviderTokenState = {

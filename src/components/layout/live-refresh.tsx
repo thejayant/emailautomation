@@ -90,8 +90,8 @@ export function LiveRefresh({
   }, [autoRefresh, intervalMs, router, startTransition]);
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className="glass-chip rounded-full px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="glass-chip rounded-[0.8rem] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.24em] text-emerald-700">
         {label}
       </span>
       <Button

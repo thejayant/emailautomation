@@ -8,12 +8,16 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const limit = Number(url.searchParams.get("limit") ?? "10");
     const offset = Number(url.searchParams.get("offset") ?? "0");
+    const query = url.searchParams.get("q") ?? "";
+    const filter = url.searchParams.get("filter") ?? "all";
     const result = await getCachedInboxThreadSummaries({
       userId: workspace.userId,
       workspaceId: workspace.workspaceId,
       projectId: workspace.activeProjectId,
       limit: Number.isFinite(limit) ? limit : 10,
       offset: Number.isFinite(offset) ? offset : 0,
+      query,
+      filter,
     });
 
     return NextResponse.json(result);

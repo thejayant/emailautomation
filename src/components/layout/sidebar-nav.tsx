@@ -74,7 +74,7 @@ function MobileNavCard({
       className={cn(
         "min-w-[15rem] rounded-[1.5rem] border p-2.5 shadow-none",
         active
-          ? "glass-control border-[rgba(118,174,201,0.42)] bg-[linear-gradient(180deg,rgba(215,237,247,0.9),rgba(250,253,255,0.82))]"
+          ? "glass-control border-[rgba(123,63,242,0.22)] bg-[linear-gradient(180deg,rgba(240,233,255,0.95),rgba(255,255,255,0.88))]"
           : "glass-control border-white/60 bg-white/52",
       )}
     >
@@ -168,8 +168,8 @@ function DesktopExpandedNavItem({
         className={cn(
             "group flex items-center gap-1.5 rounded-[1.1rem] border p-1 transition-[transform,border-color,background-color,box-shadow] duration-200 ease-out",
           active
-            ? "border-[rgba(118,174,201,0.42)] bg-[linear-gradient(180deg,rgba(215,237,247,0.94),rgba(250,253,255,0.84))] text-accent-foreground shadow-[0_14px_28px_rgba(17,39,63,0.1)]"
-            : "border-transparent bg-transparent text-sidebar-muted hover:border-white/55 hover:bg-white/44 hover:text-sidebar-foreground hover:shadow-[0_10px_22px_rgba(17,39,63,0.06)]",
+            ? "border-[rgba(123,63,242,0.2)] bg-[linear-gradient(180deg,rgba(240,233,255,0.96),rgba(255,255,255,0.86))] text-accent-foreground shadow-[0_14px_28px_rgba(123,63,242,0.1)]"
+            : "border-transparent bg-transparent text-sidebar-muted hover:border-[rgba(219,225,238,0.85)] hover:bg-white/72 hover:text-sidebar-foreground hover:shadow-[0_10px_22px_rgba(44,55,91,0.06)]",
         )}
       >
         <Link
@@ -182,8 +182,8 @@ function DesktopExpandedNavItem({
             className={cn(
               "flex size-8 shrink-0 items-center justify-center rounded-[0.9rem] border transition-colors duration-200",
               active
-                ? "border-[rgba(118,174,201,0.34)] bg-white/92 text-accent-foreground"
-                : "border-transparent bg-transparent text-sidebar-muted group-hover:border-white/58 group-hover:bg-white/48 group-hover:text-sidebar-foreground",
+                ? "border-[rgba(123,63,242,0.2)] bg-white/92 text-accent-foreground"
+                : "border-transparent bg-transparent text-sidebar-muted group-hover:border-[rgba(219,225,238,0.8)] group-hover:bg-white/72 group-hover:text-sidebar-foreground",
             )}
           >
             {renderNavIcon(item.href, "size-4")}
@@ -201,8 +201,8 @@ function DesktopExpandedNavItem({
             className={cn(
               "flex size-8 shrink-0 items-center justify-center rounded-[0.9rem] border transition",
               active
-                ? "border-[rgba(118,174,201,0.34)] bg-white/88 text-accent-foreground"
-                : "border-transparent bg-transparent text-sidebar-muted hover:border-white/58 hover:bg-white/46 hover:text-sidebar-foreground",
+                ? "border-[rgba(123,63,242,0.2)] bg-white/88 text-accent-foreground"
+                : "border-transparent bg-transparent text-sidebar-muted hover:border-[rgba(219,225,238,0.8)] hover:bg-white/72 hover:text-sidebar-foreground",
             )}
           >
             <ChevronDown
@@ -233,15 +233,15 @@ function DesktopExpandedNavItem({
                     className={cn(
                       "flex items-center gap-2.5 rounded-[0.95rem] border px-2.5 py-2 text-[13px] transition",
                       childActive
-                        ? "border-[rgba(118,174,201,0.38)] bg-[rgba(215,237,247,0.72)] text-accent-foreground"
-                        : "border-transparent text-sidebar-muted hover:border-white/52 hover:bg-white/46 hover:text-sidebar-foreground",
+                        ? "border-[rgba(123,63,242,0.22)] bg-accent text-accent-foreground"
+                        : "border-transparent text-sidebar-muted hover:border-[rgba(219,225,238,0.78)] hover:bg-white/72 hover:text-sidebar-foreground",
                     )}
                   >
                     <span
                       className={cn(
                         "flex size-6.5 shrink-0 items-center justify-center rounded-[0.8rem] border",
                         childActive
-                          ? "border-[rgba(118,174,201,0.34)] bg-white/88 text-accent-foreground"
+                          ? "border-[rgba(123,63,242,0.2)] bg-white/88 text-accent-foreground"
                           : "border-white/38 bg-white/38 text-sidebar-muted",
                       )}
                     >
@@ -276,16 +276,16 @@ function DesktopCollapsedNavItem({
   const triggerClassName = cn(
     "group flex h-[2.9rem] w-full items-center justify-center rounded-[1.05rem] border transition-[transform,border-color,background-color,box-shadow] duration-200 ease-out",
     active
-      ? "border-[rgba(118,174,201,0.44)] bg-[linear-gradient(180deg,rgba(215,237,247,0.94),rgba(250,253,255,0.84))] text-accent-foreground shadow-[0_12px_24px_rgba(17,39,63,0.1)]"
-      : "border-transparent bg-transparent text-sidebar-muted hover:border-white/55 hover:bg-white/44 hover:text-sidebar-foreground hover:shadow-[0_10px_20px_rgba(17,39,63,0.06)]",
+      ? "border-[rgba(123,63,242,0.22)] bg-[linear-gradient(180deg,rgba(240,233,255,0.96),rgba(255,255,255,0.86))] text-accent-foreground shadow-[0_12px_24px_rgba(123,63,242,0.1)]"
+      : "border-transparent bg-transparent text-sidebar-muted hover:border-[rgba(219,225,238,0.85)] hover:bg-white/72 hover:text-sidebar-foreground hover:shadow-[0_10px_20px_rgba(44,55,91,0.06)]",
   );
   const icon = (
     <span
       className={cn(
         "flex size-8 items-center justify-center rounded-[0.9rem] border transition-colors duration-200",
         active
-          ? "border-[rgba(118,174,201,0.34)] bg-white/92 text-accent-foreground"
-          : "border-transparent bg-transparent text-sidebar-muted group-hover:border-white/58 group-hover:bg-white/52 group-hover:text-sidebar-foreground",
+          ? "border-[rgba(123,63,242,0.2)] bg-white/92 text-accent-foreground"
+          : "border-transparent bg-transparent text-sidebar-muted group-hover:border-[rgba(219,225,238,0.8)] group-hover:bg-white/72 group-hover:text-sidebar-foreground",
       )}
     >
       {renderNavIcon(item.href, "size-4")}
@@ -343,7 +343,7 @@ function DesktopCollapsedNavItem({
                 {...getInstantNavProps(child.href)}
                 className={cn(
                   "justify-between",
-                  childActive ? "bg-[rgba(215,237,247,0.78)]" : "",
+                  childActive ? "bg-accent" : "",
                 )}
               >
                 <span className="flex items-center gap-3">

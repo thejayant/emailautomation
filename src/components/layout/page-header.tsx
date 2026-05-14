@@ -16,12 +16,12 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
     >
       <div className="min-w-0 space-y-4">
         {eyebrow ? (
-          <div className="glass-chip inline-flex w-fit items-center rounded-full px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+          <div className="inline-flex w-fit items-center rounded-full bg-transparent font-mono text-[11px] uppercase tracking-[0.32em] text-muted-foreground">
             {eyebrow}
           </div>
         ) : null}
         <div className="space-y-3">
-          <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.06em] text-foreground sm:text-4xl xl:text-[3.45rem]">
+          <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.055em] text-foreground sm:text-4xl">
             {title}
           </h1>
           {description ? (

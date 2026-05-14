@@ -939,6 +939,12 @@ export async function sendWithMailboxProvider(input: {
   bodyText: string;
   replyThreadId?: string | null;
   replyMessageId?: string | null;
+  attachments?: Array<{
+    filename: string;
+    contentType: string;
+    contentBase64: string;
+    size: number;
+  }>;
 }) {
   return getMailboxProvider(input.provider).sendMessage(input);
 }
@@ -946,6 +952,13 @@ export async function sendWithMailboxProvider(input: {
 export async function sendReplyToThread(input: {
   threadRecordId: string;
   body: string;
+  bodyHtml?: string;
+  attachments?: Array<{
+    filename: string;
+    contentType: string;
+    contentBase64: string;
+    size: number;
+  }>;
 }) {
   requireSupabaseConfiguration();
 
@@ -1025,6 +1038,7 @@ export async function sendReplyToThread(input: {
     latestMessage?.gmail_message_id ??
     null;
 
+  const bodyHtml = input.bodyHtml?.trim() || input.body.replace(/\n/g, "<br />");
   const sendResult = await sendWithMailboxProvider({
     provider: mailbox.provider,
     accessToken: mailbox.accessToken,
@@ -1033,10 +1047,11 @@ export async function sendReplyToThread(input: {
     subject: threadRecord.subject?.startsWith("Re:")
       ? (threadRecord.subject ?? "Re:")
       : `Re: ${threadRecord.subject ?? "Conversation"}`,
-    bodyHtml: input.body.replace(/\n/g, "<br />"),
+    bodyHtml,
     bodyText: input.body,
     replyThreadId: threadRecord.provider_thread_id ?? threadRecord.gmail_thread_id,
     replyMessageId: replyAnchorMessageId,
+    attachments: input.attachments,
   });
 
   await supabase.from("thread_messages").insert({
@@ -1051,7 +1066,7 @@ export async function sendReplyToThread(input: {
       : `Re: ${threadRecord.subject ?? "Conversation"}`,
     snippet: input.body.slice(0, 120),
     body_text: input.body,
-    body_html: input.body.replace(/\n/g, "<br />"),
+    body_html: bodyHtml,
     headers_jsonb: {},
     sent_at: new Date().toISOString(),
   });

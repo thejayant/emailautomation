@@ -62,7 +62,7 @@ export const creatorCopy = {
     advancedLabel: "Customize the sequence",
     advancedDescription:
       "Add more steps or branching rules without crowding the main composer.",
-    advancedAddStep: "Add step",
+    advancedAddStep: "Add a step",
     advancedLimit: "Up to 5 steps",
     advancedExtraStepHelper: "Extra steps can be fully edited here.",
     routeMatchLabel: "If condition matches",

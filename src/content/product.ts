@@ -942,7 +942,7 @@ export const productContent: ProductContent = {
       eyebrow: "Inbox",
       title: "Inbox",
       description: "Review synced Gmail threads and reply from the shared workspace.",
-      liveRefreshLabel: "Inbox refresh while active",
+      liveRefreshLabel: "Auto refresh on",
     },
     viewer: {
       listTitle: "Recent threads",

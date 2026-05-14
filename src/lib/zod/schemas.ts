@@ -190,4 +190,5 @@ export const resendCampaignContactSchema = z.object({
 export const inboxReplySchema = z.object({
   threadRecordId: z.string().uuid(),
   body: z.string().min(3),
+  bodyHtml: z.string().optional(),
 });

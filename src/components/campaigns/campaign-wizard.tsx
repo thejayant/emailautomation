@@ -16,7 +16,6 @@ import {
   Search,
   Sparkles,
   Users,
-  WandSparkles,
 } from "lucide-react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -29,7 +28,6 @@ import {
   describeWorkflowRoute,
   formatSendWindowSummary,
   getSendWindowPresetId,
-  isAdvancedWorkflow,
   matchesTemplateIntent,
   sendWindowPresets,
   type CampaignTemplateIntent,
@@ -66,7 +64,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LiquidSelect } from "@/components/ui/liquid-select";
-import { Textarea } from "@/components/ui/textarea";
 
 type StarterType = "template" | "scratch";
 type TemplateDialogState = {
@@ -156,6 +153,7 @@ export function CampaignWizard({
   const [starterType, setStarterType] = useState<StarterType>(initialPrimaryTemplateId ? "template" : "scratch");
   const [selectedPrimaryTemplateId, setSelectedPrimaryTemplateId] = useState(initialPrimaryTemplateId);
   const [selectedFollowUpTemplateId, setSelectedFollowUpTemplateId] = useState(initialFollowUpTemplateId);
+  const [activeMessageIndex, setActiveMessageIndex] = useState(0);
   const [templateDialogState, setTemplateDialogState] = useState<TemplateDialogState>({
     open: false,
     intent: "primary",
@@ -166,9 +164,6 @@ export function CampaignWizard({
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [contactQuery, setContactQuery] = useState("");
   const [starterError, setStarterError] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(() =>
-    isAdvancedWorkflow(resolvedInitialValues.workflowDefinition.steps as WorkflowStepInput[]),
-  );
   const [isPending, startTransition] = useTransition();
   const timezoneListId = useId();
 
@@ -180,6 +175,7 @@ export function CampaignWizard({
   const workflowSteps = (useWatch({ control: form.control, name: "workflowDefinition.steps" }) ??
     []) as CampaignFormValues["workflowDefinition"]["steps"];
   const typedWorkflowSteps = workflowSteps as WorkflowStepInput[];
+  const activeMessageStepIndex = Math.min(activeMessageIndex, Math.max(workflowSteps.length - 1, 0));
   const watchedTargetContactIds = useWatch({
     control: form.control,
     name: "targetContactIds",
@@ -267,6 +263,62 @@ export function CampaignWizard({
     }
   }, [currentStepIndex, searchParams]);
 
+  function getMessageStepLabel(index: number) {
+    return `Email ${index + 1}`;
+  }
+
+  function getMessageStepDescription(index: number) {
+    return index === 0 ? creatorCopy.message.primaryDescription : creatorCopy.message.followUpDescription;
+  }
+
+  function getMessageSendDelayLabel(index: number) {
+    if (index === 0) {
+      return creatorCopy.message.sendImmediately;
+    }
+
+    return creatorCopy.message.sendAfter(Number(workflowSteps[index - 1]?.waitDays ?? 0));
+  }
+
+  function getSequenceWaitLabel(index: number) {
+    if (index === 0) {
+      return "Immediate";
+    }
+
+    const days = Number(workflowSteps[index - 1]?.waitDays ?? 0);
+    return `Wait ${days} day${days === 1 ? "" : "s"}`;
+  }
+
+  function getStepTemplateName(index: number) {
+    if (index === 0) {
+      return selectedPrimaryTemplate?.name ?? null;
+    }
+
+    if (index === 1) {
+      return selectedFollowUpTemplate?.name ?? null;
+    }
+
+    return null;
+  }
+
+  function openMessageTemplateChooser(index: number) {
+    if (index === 0) {
+      openTemplateDialog(
+        "primary",
+        0,
+        "Choose the first email template",
+        "Pick the opening email that should preload Email 1. You can still edit every line before launch.",
+      );
+      return;
+    }
+
+    openTemplateDialog(
+      "follow-up",
+      index,
+      `Choose a template for ${getMessageStepLabel(index)}`,
+      "Pick a follow-up template for this step. You can still edit every line before launch.",
+    );
+  }
+
   function openTemplateDialog(
     intent: CampaignTemplateIntent,
     stepIndex: number,
@@ -345,13 +397,28 @@ export function CampaignWizard({
       form.setValue(`workflowDefinition.steps.${lastIndex}.onNoMatch` as never, "next_step" as never, { shouldDirty: true });
     }
     stepFields.append(buildDefaultWorkflowStep(steps.length));
-    setAdvancedOpen(true);
+    setActiveMessageIndex(steps.length);
   }
 
   function handleRemoveStep(index: number) {
+    if (index < 2) {
+      return;
+    }
+
     const nextSteps = [...form.getValues("workflowDefinition.steps")];
     nextSteps.splice(index, 1);
     stepFields.remove(index);
+    setActiveMessageIndex((current) => {
+      if (current === index) {
+        return Math.max(index - 1, 0);
+      }
+
+      if (current > index) {
+        return current - 1;
+      }
+
+      return Math.min(current, Math.max(nextSteps.length - 1, 0));
+    });
     if (nextSteps.length) {
       const lastIndex = nextSteps.length - 1;
       form.setValue(`workflowDefinition.steps.${lastIndex}.onMatch` as never, "exit_sequence" as never, { shouldDirty: true });
@@ -476,7 +543,7 @@ export function CampaignWizard({
 
   return (
     <>
-      <TemplateChooserDialog open={templateDialogState.open} onOpenChange={(open) => setTemplateDialogState((current) => ({ ...current, open }))} templates={templates} selectedTemplateId={templateDialogState.stepIndex === 1 ? selectedFollowUpTemplateId : selectedPrimaryTemplateId} onSelect={applyTemplateToStep} intent={templateDialogState.intent} title={templateDialogState.title} description={templateDialogState.description} />
+      <TemplateChooserDialog open={templateDialogState.open} onOpenChange={(open) => setTemplateDialogState((current) => ({ ...current, open }))} templates={templates} selectedTemplateId={templateDialogState.stepIndex === 0 ? selectedPrimaryTemplateId : templateDialogState.stepIndex === 1 ? selectedFollowUpTemplateId : ""} onSelect={applyTemplateToStep} intent={templateDialogState.intent} title={templateDialogState.title} description={templateDialogState.description} />
       <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
         <DialogContent className="max-h-[88vh] overflow-y-auto">
           <DialogHeader>
@@ -564,20 +631,72 @@ export function CampaignWizard({
                 ) : null}
                 {activeStep.id === "message" ? (
                   <div className="grid gap-5" data-tour="campaign-builder-message">
-                    <CampaignMessageCard form={form} index={0} label={creatorCopy.message.primaryLabel} description={creatorCopy.message.primaryDescription} previewContact={previewContact} sendDelayLabel={creatorCopy.message.sendImmediately} templateName={selectedPrimaryTemplate?.name ?? null} onOpenTemplateChooser={() => openTemplateDialog("primary", 0, "Choose the first email template", "Pick the opening email that should preload Email 1. You can still edit every line before launch.")} />
-                    <CampaignMessageCard form={form} index={1} label={creatorCopy.message.followUpLabel} description={creatorCopy.message.followUpDescription} previewContact={previewContact} sendDelayLabel={creatorCopy.message.sendAfter(Number(primaryStep?.waitDays ?? 0))} templateName={selectedFollowUpTemplate?.name ?? null} onOpenTemplateChooser={() => openTemplateDialog("follow-up", 1, "Choose the follow-up template", "Pick the follow-up email that should send after the opener. This list only shows follow-up templates.")} />
-                    <div className="rounded-[1.75rem] border border-white/65 bg-white/44 p-5">
-                      <button type="button" onClick={() => setAdvancedOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
+                    <CampaignMessageCard form={form} index={activeMessageStepIndex} label={getMessageStepLabel(activeMessageStepIndex)} description={getMessageStepDescription(activeMessageStepIndex)} previewContact={previewContact} sendDelayLabel={getMessageSendDelayLabel(activeMessageStepIndex)} templateName={getStepTemplateName(activeMessageStepIndex)} onOpenTemplateChooser={() => openMessageTemplateChooser(activeMessageStepIndex)} />
+                    <div className="overflow-hidden rounded-[1.65rem] border border-slate-200/80 bg-white/74 shadow-[0_18px_42px_rgba(17,39,63,0.08)]">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-5 py-4">
                         <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="neutral"><WandSparkles className="size-4" />{creatorCopy.message.advancedLabel}</Badge>
-                            <Badge variant="neutral">{creatorCopy.message.advancedLimit}</Badge>
+                          <div className="flex items-center gap-2">
+                            <span className="flex size-9 items-center justify-center rounded-[0.85rem] border border-violet-200 bg-violet-50 text-violet-700">
+                              <Mail className="size-4" />
+                            </span>
+                            <p className="text-base font-semibold tracking-[-0.03em] text-foreground">Sequence</p>
                           </div>
-                          <p className="text-sm leading-6 text-muted-foreground">{creatorCopy.message.advancedDescription}</p>
+                          <p className="text-sm text-muted-foreground">Define the order and timing of your emails.</p>
                         </div>
-                        <Button type="button" variant="ghost" size="sm">{advancedOpen ? "Hide" : "Show"}</Button>
-                      </button>
-                      {advancedOpen ? <div className="mt-5 grid gap-4">{stepFields.fields.map((field, index) => { const step = typedWorkflowSteps[index]; return <div key={field.id} className="relative pl-7">{index < stepFields.fields.length - 1 ? <span className="absolute left-[11px] top-8 h-[calc(100%-1rem)] w-px bg-white/70" /> : null}<span className="absolute left-0 top-6 flex size-6 items-center justify-center rounded-full border border-white/72 bg-white/84 text-[11px] font-semibold text-accent-foreground">{index + 1}</span><div className="rounded-[1.5rem] border border-white/65 bg-white/58 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="space-y-1"><p className="text-base font-semibold text-foreground">{step?.name || `Step ${index + 1}`}</p><p className="text-sm leading-6 text-muted-foreground">{describeWorkflowRoute(step)}</p></div>{index >= 2 ? <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveStep(index)}>Remove</Button> : null}</div><div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="grid gap-2 md:col-span-2"><Label htmlFor={`advanced-step-${index}-name`}>{creatorCopy.message.routeNameLabel}</Label><Input id={`advanced-step-${index}-name`} {...form.register(`workflowDefinition.steps.${index}.name` as never)} /></div><div className="grid gap-2"><Label htmlFor={`advanced-step-${index}-wait`}>{creatorCopy.message.routeDelayLabel}</Label><Input id={`advanced-step-${index}-wait`} type="number" min={0} max={30} {...form.register(`workflowDefinition.steps.${index}.waitDays` as never)} /></div><div className="grid gap-2"><Label htmlFor={`advanced-step-${index}-branch`}>{creatorCopy.message.routeBranchLabel}</Label><LiquidSelect id={`advanced-step-${index}-branch`} ariaLabel={creatorCopy.message.routeBranchLabel} value={step?.branchCondition ?? "time"} onValueChange={(value) => form.setValue(`workflowDefinition.steps.${index}.branchCondition` as never, value as never, { shouldDirty: true, shouldValidate: true })} triggerClassName="h-12 rounded-[1.15rem]" options={[{ value: "time", label: creatorCopy.message.timeLabel, description: "Send after the wait period" }, { value: "opened", label: creatorCopy.message.openedLabel, description: "Only continue if they opened" }, { value: "clicked", label: creatorCopy.message.clickedLabel, description: "Only continue if they clicked" }]} /></div></div><div className="mt-4 grid gap-4 md:grid-cols-2"><div className="grid gap-2"><Label htmlFor={`advanced-step-${index}-match`}>{creatorCopy.message.routeMatchLabel}</Label><LiquidSelect id={`advanced-step-${index}-match`} ariaLabel={creatorCopy.message.routeMatchLabel} value={step?.onMatch ?? "next_step"} onValueChange={(value) => form.setValue(`workflowDefinition.steps.${index}.onMatch` as never, value as never, { shouldDirty: true, shouldValidate: true })} triggerClassName="h-12 rounded-[1.15rem]" options={[{ value: "next_step", label: creatorCopy.message.nextStepLabel, description: "Keep the sequence moving" }, { value: "exit_sequence", label: creatorCopy.message.exitLabel, description: "Stop this contact here" }]} /></div><div className="grid gap-2"><Label htmlFor={`advanced-step-${index}-no-match`}>{creatorCopy.message.routeNoMatchLabel}</Label><LiquidSelect id={`advanced-step-${index}-no-match`} ariaLabel={creatorCopy.message.routeNoMatchLabel} value={step?.onNoMatch ?? "next_step"} onValueChange={(value) => form.setValue(`workflowDefinition.steps.${index}.onNoMatch` as never, value as never, { shouldDirty: true, shouldValidate: true })} triggerClassName="h-12 rounded-[1.15rem]" options={[{ value: "next_step", label: creatorCopy.message.nextStepLabel, description: "Keep the sequence moving" }, { value: "exit_sequence", label: creatorCopy.message.exitLabel, description: "Stop this contact here" }]} /></div></div>{index < 2 ? <div className="mt-4 rounded-[1.35rem] border border-white/60 bg-white/52 px-4 py-3 text-sm text-muted-foreground">Message content for this step stays in the main editor above.</div> : <div className="mt-4 grid gap-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-foreground">{creatorCopy.message.advancedExtraStepHelper}</p><Button type="button" variant="ghost" size="sm" onClick={() => form.setValue(`workflowDefinition.steps.${index}.mode` as never, ((step?.mode ?? "text") === "html" ? "text" : "html") as never, { shouldDirty: true, shouldValidate: true })}>{(step?.mode ?? "text") === "html" ? creatorCopy.message.switchToText : creatorCopy.message.switchToHtml}</Button></div><div className="grid gap-2"><Label htmlFor={`advanced-step-${index}-subject`}>{creatorCopy.message.subjectLabel}</Label><Input id={`advanced-step-${index}-subject`} {...form.register(`workflowDefinition.steps.${index}.subject` as never)} /></div>{(step?.mode ?? "text") === "html" ? <div className="grid gap-2"><Label htmlFor={`advanced-step-${index}-html`}>{creatorCopy.message.htmlBodyLabel}</Label><Textarea id={`advanced-step-${index}-html`} className="min-h-48 font-mono text-xs" {...form.register(`workflowDefinition.steps.${index}.bodyHtml` as never)} /></div> : <div className="grid gap-2"><Label htmlFor={`advanced-step-${index}-body`}>{creatorCopy.message.bodyLabel}</Label><Textarea id={`advanced-step-${index}-body`} className="min-h-48" {...form.register(`workflowDefinition.steps.${index}.body` as never)} /></div>}</div>}</div></div>; })}<div className="flex justify-end"><Button type="button" variant="outline" onClick={handleAddStep} disabled={stepFields.fields.length >= 5}><Plus className="size-4" />{creatorCopy.message.advancedAddStep}</Button></div></div> : null}
+                        <Badge variant="neutral">{workflowSteps.length} steps</Badge>
+                      </div>
+                      <div className="divide-y divide-slate-200/80">
+                        {stepFields.fields.map((field, index) => {
+                          const step = typedWorkflowSteps[index];
+                          const isActive = index === activeMessageStepIndex;
+
+                          return (
+                            <div
+                              key={field.id}
+                              className={cn(
+                                "grid gap-3 px-4 py-3 transition sm:grid-cols-[minmax(0,1fr)_auto]",
+                                isActive ? "bg-violet-50/70" : "bg-white/50 hover:bg-white/82",
+                              )}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setActiveMessageIndex(index)}
+                                className="grid min-w-0 gap-3 text-left sm:grid-cols-[auto_minmax(0,10rem)_auto_minmax(0,1fr)] sm:items-center"
+                              >
+                                <span className={cn("flex size-9 items-center justify-center rounded-full border", isActive ? "border-violet-200 bg-violet-100 text-violet-700" : "border-slate-200 bg-white text-muted-foreground")}>
+                                  <Mail className="size-4" />
+                                </span>
+                                <span className="grid min-w-0 gap-1">
+                                  <span className="text-sm font-semibold text-foreground">{getMessageStepLabel(index)}</span>
+                                  <span className="truncate text-xs text-muted-foreground">{step?.name || `Step ${index + 1}`}</span>
+                                </span>
+                                <Badge variant={index === 0 ? "success" : "neutral"}>{getSequenceWaitLabel(index)}</Badge>
+                                <span className="grid min-w-0 gap-1">
+                                  <span className="truncate text-sm font-medium text-foreground">{step?.subject || creatorCopy.summary.noSubject}</span>
+                                  <span className="line-clamp-1 text-xs text-muted-foreground">{describeWorkflowRoute(step)}</span>
+                                </span>
+                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <Button type="button" variant={isActive ? "secondary" : "ghost"} size="sm" onClick={() => setActiveMessageIndex(index)}>
+                                  Edit
+                                  <ChevronRight className="size-4" />
+                                </Button>
+                                {index >= 2 ? (
+                                  <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveStep(index)}>
+                                    Remove
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-center border-t border-slate-200/80 bg-white/64 px-5 py-4">
+                        <Button type="button" variant="outline" size="sm" className="h-9 rounded-[0.9rem]" onClick={handleAddStep} disabled={stepFields.fields.length >= 5}>
+                          <Plus className="size-4" />
+                          {creatorCopy.message.advancedAddStep}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : null}

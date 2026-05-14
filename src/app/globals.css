@@ -1,49 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #eef3f8;
-  --foreground: #10243a;
-  --card: #f8fbff;
-  --card-foreground: #10243a;
-  --muted: #dde7f0;
-  --muted-foreground: #607589;
-  --border: rgba(96, 117, 137, 0.22);
-  --input: rgba(255, 255, 255, 0.82);
-  --primary: #b4236d;
-  --primary-foreground: #f7fbff;
-  --secondary: #eff5df;
-  --secondary-foreground: #415235;
-  --accent: #d7edf7;
-  --accent-foreground: #0d5376;
-  --danger: #b64f44;
+  --background: #f4f7fb;
+  --foreground: #101936;
+  --card: #ffffff;
+  --card-foreground: #101936;
+  --muted: #edf1f8;
+  --muted-foreground: #66748f;
+  --border: rgba(122, 134, 162, 0.18);
+  --input: rgba(255, 255, 255, 0.96);
+  --primary: #7b3ff2;
+  --primary-foreground: #ffffff;
+  --secondary: #e7f7ec;
+  --secondary-foreground: #187a3d;
+  --accent: #f0e9ff;
+  --accent-foreground: #6335d9;
+  --danger: #c0445e;
   --danger-foreground: #fff8f7;
-  --ring: rgba(180, 35, 109, 0.22);
-  --sidebar: #ebf2f9;
-  --sidebar-foreground: #10243a;
-  --sidebar-muted: #6a7d90;
-  --chart-1: #4d7ff1;
-  --chart-2: #84b5d3;
-  --chart-3: #f1b77b;
-  --chart-4: #8cceb8;
-  --chart-5: #d88f9e;
-  --glass-nav: rgba(246, 250, 255, 0.52);
-  --glass-control: rgba(255, 255, 255, 0.74);
-  --glass-content: rgba(250, 252, 255, 0.9);
-  --glass-content-strong: rgba(253, 254, 255, 0.96);
-  --glass-border: rgba(255, 255, 255, 0.62);
-  --glass-border-strong: rgba(255, 255, 255, 0.8);
-  --glass-highlight: rgba(255, 255, 255, 0.88);
-  --glass-shadow: 0 24px 64px rgba(17, 39, 63, 0.14);
-  --glass-shadow-soft: 0 14px 34px rgba(17, 39, 63, 0.1);
-  --glass-shadow-pressed: 0 10px 24px rgba(17, 39, 63, 0.12);
-  --glass-blur-nav: 28px;
-  --glass-blur-control: 20px;
-  --glass-blur-soft: 14px;
-  --scrollbar-track: rgba(248, 239, 245, 0.92);
-  --scrollbar-track-strong: rgba(232, 214, 225, 0.95);
-  --scrollbar-thumb: rgba(188, 24, 95, 0.94);
-  --scrollbar-thumb-strong: rgba(162, 18, 81, 0.98);
-  --scrollbar-thumb-shadow: rgba(186, 16, 87, 0.24);
+  --ring: rgba(123, 63, 242, 0.22);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #101936;
+  --sidebar-muted: #71809b;
+  --chart-1: #7b3ff2;
+  --chart-2: #d8258f;
+  --chart-3: #2fbe67;
+  --chart-4: #4d7ff1;
+  --chart-5: #f0aa3d;
+  --glass-nav: rgba(255, 255, 255, 0.86);
+  --glass-control: rgba(255, 255, 255, 0.9);
+  --glass-content: rgba(255, 255, 255, 0.92);
+  --glass-content-strong: rgba(255, 255, 255, 0.98);
+  --glass-border: rgba(214, 221, 235, 0.82);
+  --glass-border-strong: rgba(219, 225, 238, 0.96);
+  --glass-highlight: rgba(255, 255, 255, 0.96);
+  --glass-shadow: 0 22px 58px rgba(44, 55, 91, 0.1);
+  --glass-shadow-soft: 0 14px 34px rgba(44, 55, 91, 0.08);
+  --glass-shadow-pressed: 0 8px 20px rgba(44, 55, 91, 0.09);
+  --glass-blur-nav: 22px;
+  --glass-blur-control: 16px;
+  --glass-blur-soft: 12px;
+  --scrollbar-track: rgba(241, 244, 250, 0.96);
+  --scrollbar-track-strong: rgba(223, 229, 240, 0.96);
+  --scrollbar-thumb: rgba(123, 63, 242, 0.78);
+  --scrollbar-thumb-strong: rgba(101, 51, 215, 0.9);
+  --scrollbar-thumb-shadow: rgba(123, 63, 242, 0.14);
 }
 
 @theme inline {
@@ -89,10 +89,8 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.94), transparent 22%),
-    radial-gradient(circle at 88% 16%, rgba(179, 217, 245, 0.42), transparent 24%),
-    radial-gradient(circle at 50% 100%, rgba(246, 215, 187, 0.35), transparent 26%),
-    linear-gradient(180deg, #edf4fa 0%, #e6eef6 48%, #edf2f8 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), transparent 22%),
+    linear-gradient(135deg, #f8fbff 0%, #f2f5fa 48%, #eef3f8 100%);
   color: var(--foreground);
   font-family: var(--font-manrope), sans-serif;
 }
@@ -103,8 +101,7 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.58), transparent 44%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 38%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), transparent 44%);
   z-index: -2;
 }
 
@@ -114,8 +111,8 @@ body::after {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+    linear-gradient(rgba(122, 134, 162, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(122, 134, 162, 0.055) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.32), transparent 92%);
   z-index: -1;
@@ -134,7 +131,7 @@ select {
 }
 
 ::selection {
-  background: rgba(77, 127, 241, 0.18);
+  background: rgba(123, 63, 242, 0.16);
 }
 
 *:not(.scrollbar-none) {
@@ -165,7 +162,7 @@ body::-webkit-scrollbar-thumb,
   border-radius: 999px;
   border: 3px solid transparent;
   background:
-    linear-gradient(180deg, rgba(255, 126, 188, 0.98), rgba(222, 32, 115, 0.98) 52%, rgba(186, 16, 87, 0.99)),
+    linear-gradient(180deg, rgba(165, 126, 255, 0.98), rgba(123, 63, 242, 0.98) 52%, rgba(99, 53, 217, 0.99)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
   background-clip: padding-box, border-box;
   box-shadow:
@@ -177,7 +174,7 @@ html::-webkit-scrollbar-thumb:hover,
 body::-webkit-scrollbar-thumb:hover,
 *:not(.scrollbar-none)::-webkit-scrollbar-thumb:hover {
   background:
-    linear-gradient(180deg, rgba(255, 146, 199, 1), rgba(234, 45, 125, 0.99) 52%, rgba(197, 21, 94, 1)),
+    linear-gradient(180deg, rgba(178, 144, 255, 1), rgba(132, 75, 246, 0.99) 52%, rgba(105, 56, 224, 1)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0));
   background-clip: padding-box, border-box;
 }
@@ -186,7 +183,7 @@ html::-webkit-scrollbar-thumb:active,
 body::-webkit-scrollbar-thumb:active,
 *:not(.scrollbar-none)::-webkit-scrollbar-thumb:active {
   background:
-    linear-gradient(180deg, rgba(238, 70, 143, 0.98), rgba(189, 22, 92, 0.98)),
+    linear-gradient(180deg, rgba(130, 72, 238, 0.98), rgba(100, 52, 218, 0.98)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
   background-clip: padding-box, border-box;
 }
@@ -208,15 +205,13 @@ body::-webkit-scrollbar-corner,
 
 .page-gradient {
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 22%),
-    radial-gradient(circle at top right, rgba(181, 216, 245, 0.28), transparent 22%),
-    linear-gradient(180deg, rgba(240, 245, 251, 0.82), rgba(231, 238, 246, 0.96));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(244, 247, 251, 0.96));
 }
 
 .glass-nav {
   border: 1px solid var(--glass-border);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.14)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.78)),
     var(--glass-nav);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
@@ -227,7 +222,7 @@ body::-webkit-scrollbar-corner,
 .glass-control {
   border: 1px solid var(--glass-border-strong);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.48)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 252, 255, 0.84)),
     var(--glass-control);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
@@ -236,9 +231,9 @@ body::-webkit-scrollbar-corner,
 }
 
 .solid-content {
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(219, 225, 238, 0.82);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 253, 0.82)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 252, 255, 0.92)),
     var(--glass-content);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
@@ -249,8 +244,8 @@ body::-webkit-scrollbar-corner,
 .glass-chip {
   border: 1px solid var(--glass-border-strong);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.42)),
-    rgba(255, 255, 255, 0.58);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 252, 255, 0.82)),
+    rgba(255, 255, 255, 0.88);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
     0 10px 24px rgba(17, 39, 63, 0.08);
@@ -258,26 +253,26 @@ body::-webkit-scrollbar-corner,
 }
 
 .button-brand {
-  border-color: rgba(174, 18, 88, 0.94);
+  border-color: rgba(123, 63, 242, 0.74);
   background:
-    linear-gradient(180deg, rgba(255, 104, 173, 0.98), rgba(222, 32, 115, 0.98) 52%, rgba(186, 16, 87, 0.99) 100%),
+    linear-gradient(135deg, rgba(219, 35, 142, 0.99), rgba(140, 74, 247, 0.99) 58%, rgba(104, 76, 230, 0.99) 100%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(122, 6, 55, 0.2),
-    0 18px 40px rgba(190, 20, 95, 0.28);
+    inset 0 -1px 0 rgba(79, 37, 158, 0.2),
+    0 18px 40px rgba(123, 63, 242, 0.24);
   color: #fff7fb;
 }
 
 .button-brand:hover {
-  border-color: rgba(188, 24, 95, 0.98);
+  border-color: rgba(123, 63, 242, 0.9);
   background:
-    linear-gradient(180deg, rgba(255, 124, 186, 1), rgba(232, 47, 125, 0.99) 52%, rgba(197, 21, 94, 1) 100%),
+    linear-gradient(135deg, rgba(229, 49, 153, 1), rgba(151, 86, 255, 0.99) 58%, rgba(113, 86, 238, 1) 100%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    inset 0 -1px 0 rgba(122, 6, 55, 0.22),
-    0 24px 48px rgba(190, 20, 95, 0.34);
+    inset 0 -1px 0 rgba(79, 37, 158, 0.22),
+    0 24px 48px rgba(123, 63, 242, 0.3);
 }
 
 .button-brand:active {

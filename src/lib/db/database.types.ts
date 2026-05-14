@@ -189,6 +189,21 @@ export type Database = {
         Insert: Omit<Database["public"]["Tables"]["import_rows"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["import_rows"]["Insert"]>;
       };
+      inbox_thread_states: {
+        Row: {
+          created_at: string;
+          id: string;
+          last_read_at: string | null;
+          project_id: string;
+          starred_at: string | null;
+          thread_id: string;
+          updated_at: string;
+          updated_by_user_id: string | null;
+          workspace_id: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["inbox_thread_states"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["inbox_thread_states"]["Insert"]>;
+      };
       message_threads: {
         Row: {
           campaign_contact_id: string | null;
